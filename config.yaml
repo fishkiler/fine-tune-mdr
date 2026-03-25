@@ -252,3 +252,31 @@ sources:
     enabled: true
     simulator_url: "http://192.168.1.67:6971"
     sigma_hq: true
+
+# --- Fast Iteration Track ---
+# SmolLM2-135M for rapid data quality validation before full Foundation-Sec-8B runs.
+# Trains in ~30 min — use to test domain weight changes and prompt formatting.
+fast_iteration:
+  model: "HuggingFaceTB/SmolLM2-135M-Instruct"
+  max_seq_length: 512
+  dtype: "bfloat16"
+  attn_implementation: "sdpa"
+
+  lora:
+    r: 8
+    alpha: 16
+    dropout: 0.05
+    target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+    bias: "none"
+
+  training:
+    epochs: 3
+    batch_size: 32
+    learning_rate: 2.0e-4
+    output_dir: "outputs/smollm2_fast"
+    logging_steps: 10
+    time_limit_hours: 0.5

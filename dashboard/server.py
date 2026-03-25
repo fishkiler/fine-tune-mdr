@@ -634,8 +634,14 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 
 @app.get("/")
+async def serve_landing():
+    """Serve the landing page."""
+    return FileResponse(STATIC_DIR / "landing.html")
+
+
+@app.get("/train")
 async def serve_dashboard():
-    """Serve the dashboard HTML."""
+    """Serve the SFT training dashboard."""
     return FileResponse(STATIC_DIR / "index.html")
 
 
@@ -655,6 +661,12 @@ async def serve_bench():
 async def serve_rl():
     """Serve the RL training dashboard."""
     return FileResponse(STATIC_DIR / "rl.html")
+
+
+@app.get("/stix")
+async def serve_stix():
+    """Serve the STIX knowledge graph visualizer."""
+    return FileResponse(STATIC_DIR / "stix_graph.html")
 
 
 @app.get("/static/{filename}")
