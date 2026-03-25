@@ -238,6 +238,33 @@
             margin-top: 14px;
         }
 
+        /* Section divider */
+        .section-divider {
+            text-align: center;
+            margin: 12px 0 24px;
+            position: relative;
+        }
+        .section-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0; right: 0;
+            height: 1px;
+            background: var(--border-color);
+        }
+        .section-label {
+            position: relative;
+            background: var(--bg-primary);
+            padding: 0 16px;
+            font-size: 11px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+        .tutorial-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
         /* Footer */
         .footer {
             text-align: center;
@@ -367,6 +394,37 @@
                 <div class="card-tag">Knowledge Graph</div>
             </a>
         </main>
+
+        <div class="section-divider">
+            <span class="section-label">Learning Path</span>
+        </div>
+
+        <div class="card-grid tutorial-grid">
+            <!-- Phase 0: nanoGPT -->
+            <a href="/learn/nanogpt" class="card" style="--accent: var(--cyber-red);">
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    <path d="M9 10l2 2 4-4"/>
+                </svg>
+                <div class="card-title">Phase 0: nanoGPT</div>
+                <div class="card-desc">Build hyperparameter intuition on Shakespeare. 7 hands-on experiments where every change shows visible effects in 3 minutes.</div>
+                <div class="card-tag">Learn the Basics</div>
+            </a>
+
+            <!-- Phase 1: autoresearch -->
+            <a href="/learn/autoresearch" class="card" style="--accent: var(--cyber-yellow);">
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                    <path d="M8 11h6"/>
+                    <path d="M11 8v6"/>
+                </svg>
+                <div class="card-title">Phase 1: autoresearch</div>
+                <div class="card-desc">Let the machine run 100 experiments overnight. Autonomous architecture search and optimizer comparison on DGX Spark.</div>
+                <div class="card-tag">Autonomous Research</div>
+            </a>
+        </div>
 
         <footer class="footer">
             Fine-Tune MDR &mdash; DGX Spark GB10 &bull; Port 28000 &bull;

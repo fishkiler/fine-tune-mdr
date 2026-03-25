@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 1: autoresearch — Fine-Tune MDR</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a28;
+            --text-primary: #e0e0e8;
+            --text-secondary: #888898;
+            --cyber-green: #00ff88;
+            --cyber-cyan: #00ffdd;
+            --cyber-blue: #00aaff;
+            --cyber-red: #ff4466;
+            --cyber-yellow: #ffaa00;
+            --cyber-purple: #aa66ff;
+            --border-color: #1e1e2e;
+            --accent: var(--cyber-yellow);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.7;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .top-bar .logo { font-size: 13px; color: var(--accent); font-weight: 600; }
+        .top-bar .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+        .top-bar .nav-link:hover { color: var(--cyber-green); }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px 24px 60px;
+        }
+
+        .hero { text-align: center; margin-bottom: 40px; }
+        .hero .phase-tag {
+            display: inline-block;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+            padding: 4px 12px;
+            border-radius: 3px;
+            margin-bottom: 16px;
+        }
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .hero h1 span { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-width: 620px;
+            margin: 0 auto;
+        }
+
+        details {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        details[open] { border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color)); }
+        details summary {
+            padding: 16px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '\25B6';
+            font-size: 9px;
+            color: var(--accent);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+        details .content {
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+
+        .code-block {
+            position: relative;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        .code-block code {
+            font-size: 12px;
+            color: var(--cyber-green);
+            white-space: pre;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .copy-btn:hover { color: var(--cyber-green); border-color: var(--cyber-green); }
+
+        .sub-label {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 16px 0 6px;
+            font-weight: 600;
+        }
+        .sub-label:first-child { margin-top: 0; }
+
+        p { margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; }
+        p strong { color: var(--text-primary); }
+
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 36px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-header .line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 12px;
+        }
+        th {
+            text-align: left;
+            padding: 8px 12px;
+            background: #0d0d14;
+            color: var(--accent);
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-color);
+        }
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        tr:hover td { color: var(--text-primary); }
+
+        /* Prereq checklist */
+        .prereq-list { list-style: none; }
+        .prereq-list li {
+            padding: 6px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .prereq-list li::before {
+            content: '\25CB';
+            color: var(--accent);
+            font-size: 10px;
+        }
+        .prereq-list li.done::before {
+            content: '\25CF';
+            color: var(--cyber-green);
+        }
+
+        /* Config block */
+        .config-block {
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+        .config-block .key { color: var(--cyber-cyan); }
+        .config-block .val { color: var(--cyber-green); }
+        .config-block .comment { color: #555; }
+
+        /* Visual boxes */
+        .visual-box {
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .visual-box .caption {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        /* Search grid visual */
+        .search-grid {
+            display: inline-grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 3px;
+        }
+        .search-cell {
+            width: 22px; height: 22px;
+            border-radius: 3px;
+            transition: background 0.3s;
+        }
+
+        /* Attention pattern grid */
+        .attn-demo { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; }
+        .attn-pattern { text-align: center; }
+        .attn-pattern .label { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+        .attn-grid {
+            display: inline-grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+        }
+        .attn-cell {
+            width: 14px; height: 14px;
+            border-radius: 2px;
+        }
+
+        /* Checklist */
+        .checklist { list-style: none; }
+        .checklist li {
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checklist input[type="checkbox"] {
+            accent-color: var(--cyber-green);
+            width: 16px;
+            height: 16px;
+        }
+
+        .note-area {
+            width: 100%;
+            min-height: 60px;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 10px 12px;
+            resize: vertical;
+            margin-top: 8px;
+        }
+        .note-area::placeholder { color: #444; }
+        .note-area:focus { outline: none; border-color: var(--accent); }
+
+        /* Callout */
+        .callout {
+            border-left: 3px solid var(--accent);
+            padding: 12px 16px;
+            margin: 12px 0;
+            background: color-mix(in srgb, var(--accent) 5%, var(--bg-card));
+            border-radius: 0 6px 6px 0;
+        }
+        .callout p { margin-bottom: 0; }
+
+        @media (max-width: 540px) {
+            .container { padding: 24px 16px 40px; }
+            .hero h1 { font-size: 24px; }
+            .attn-demo { gap: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <span class="logo">&gt;_ Phase 1: autoresearch</span>
+    <div>
+        <a href="/" class="nav-link">Home</a>
+        <a href="/learn/nanogpt" class="nav-link">&larr; Phase 0: nanoGPT</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <header class="hero">
+        <div class="phase-tag">Phase 1 &mdash; Autonomous Research</div>
+        <h1>auto<span>research</span></h1>
+        <p class="subtitle">Now that you have intuition, let the machine run 100 experiments overnight while you sleep. Wake up smarter.</p>
+    </header>
+
+    <!-- PREREQUISITES -->
+    <details open>
+        <summary>Prerequisites</summary>
+        <div class="content">
+            <p>Before starting autoresearch, make sure you have:</p>
+            <ul class="prereq-list">
+                <li>Completed <a href="/learn/nanogpt" style="color:var(--cyber-green)">Phase 0: nanoGPT Shakespeare</a></li>
+                <li>Flash Attention compiled for sm_120 (see below)</li>
+                <li>Environment variables configured for CUDA 13/12 compatibility</li>
+                <li>A tmux or screen session (experiments run overnight)</li>
+            </ul>
+
+            <div class="sub-label">Flash Attention Build (one-time, ~75 min)</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>export TORCH_CUDA_ARCH_LIST="12.0"
+export CUDA_HOME=/usr/local/cuda
+git clone https://github.com/Dao-AILab/flash-attention.git
+cd flash-attention
+python setup.py install</code>
+            </div>
+            <p>The sm_120 build runs on sm_121 (Blackwell) via forward compatibility. This is the <strong>single highest-leverage optimization</strong> &mdash; unlocks full training throughput for all models.</p>
+
+            <div class="sub-label">Environment Variables</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>export TORCH_CUDA_ARCH_LIST="12.0"
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:${LD_LIBRARY_PATH}"
+export VLLM_MOE_KERNEL_BACKEND=triton
+export VLLM_DISABLED_KERNELS=cutlass_moe_mm,cutlass_scaled_mm
+export TRITON_PTXAS_PATH=/usr/local/cuda-13.0/bin/ptxas</code>
+            </div>
+        </div>
+    </details>
+
+    <!-- SETUP -->
+    <details>
+        <summary>Setup</summary>
+        <div class="content">
+            <p>Clone autoresearch and install dependencies using <strong>uv</strong> (ultra-fast Python package manager):</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>git clone https://github.com/karpathy/autoresearch
+cd autoresearch
+
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies and prepare data
+uv sync
+uv run prepare.py</code>
+            </div>
+            <p><code>prepare.py</code> downloads and tokenizes the training corpus. autoresearch then uses an LLM agent to design, run, and evaluate experiments autonomously.</p>
+
+            <div class="callout">
+                <p><strong>How autoresearch works:</strong> An AI agent reads a <code>program.md</code> file describing what to explore. It designs an experiment, modifies training code, runs it, reads the results, and decides what to try next. It repeats this loop ~100 times overnight.</p>
+            </div>
+        </div>
+    </details>
+
+    <!-- DGX SPARK CONFIG -->
+    <div class="section-header">
+        <span>Configuration</span>
+        <span class="line"></span>
+    </div>
+
+    <details>
+        <summary>DGX Spark program.md Additions</summary>
+        <div class="content">
+            <p>Add this to autoresearch's <code>program.md</code> so the agent understands your hardware and what to explore:</p>
+
+            <div class="sub-label">Hardware Context</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>## Hardware context
+- DGX Spark: NVIDIA GB10 Superchip, sm_121, 128GB unified memory
+- Flash Attention compiled for sm_120 (forward compatible with sm_121)
+- CUDA 13.0 — do NOT use torch_compile (recompilation spikes on Blackwell)
+- SDPA available as fallback: attn_implementation="sdpa"
+- Muon optimizer works well on this hardware
+- BF16 is faster than FP16 on Blackwell</code>
+            </div>
+
+            <div class="sub-label">Exploration Axes</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>## What to explore
+- Architecture changes (depth, heads, FFN multiplier)
+- Optimizer settings (Muon momentum, AdamW beta2)
+- Banded vs full attention patterns (WINDOW_PATTERN: "L" vs "SSSL")
+- Sequence length vs batch size tradeoffs</code>
+            </div>
+
+            <p>These constraints prevent the agent from wasting time on things that don't work on your hardware (like torch.compile or FP16), and point it toward the most productive search directions.</p>
+        </div>
+    </details>
+
+    <details>
+        <summary>Understanding the Exploration Axes</summary>
+        <div class="content">
+            <div class="sub-label">Architecture</div>
+            <p><strong>Depth</strong> (number of layers), <strong>width</strong> (hidden dimension), <strong>heads</strong> (attention head count), and <strong>FFN multiplier</strong> (feedforward network size relative to hidden dim). The agent tries different combinations to find what gives the best loss per parameter.</p>
+            <p>Common finding: wider + shallower often beats narrow + deep at small scale. The agent discovers this empirically.</p>
+
+            <div class="sub-label">Optimizers</div>
+            <p><strong>AdamW</strong> is the standard. <strong>Muon</strong> is newer and often converges faster. The agent compares them with different learning rates, momentum values, and schedules.</p>
+
+            <div class="sub-label">Attention Patterns</div>
+            <p>Full causal attention is expensive. Alternatives like <strong>sliding window</strong> or <strong>banded patterns</strong> (SSSL = short-short-short-long) reduce compute while retaining most quality. The agent measures the tradeoff.</p>
+
+            <div class="visual-box">
+                <div class="attn-demo">
+                    <div class="attn-pattern">
+                        <div class="label">Causal (Full)</div>
+                        <div class="attn-grid" id="attnCausal"></div>
+                    </div>
+                    <div class="attn-pattern">
+                        <div class="label">Sliding Window</div>
+                        <div class="attn-grid" id="attnWindow"></div>
+                    </div>
+                    <div class="attn-pattern">
+                        <div class="label">Banded (SSSL)</div>
+                        <div class="attn-grid" id="attnBanded"></div>
+                    </div>
+                </div>
+                <div class="caption">Green = token can attend here. Dark = masked. Sliding window is sparse but fast. Banded alternates local and global layers.</div>
+            </div>
+
+            <div class="sub-label">Sequence / Batch Tradeoffs</div>
+            <p>Longer sequences see more context but use more memory (quadratic in attention). Larger batches give smoother gradients but also use more memory. The agent finds the sweet spot for your 128GB unified memory.</p>
+        </div>
+    </details>
+
+    <!-- READING RESULTS -->
+    <div class="section-header">
+        <span>Reading Results</span>
+        <span class="line"></span>
+    </div>
+
+    <details>
+        <summary>What is val_bpb?</summary>
+        <div class="content">
+            <p><strong>val_bpb</strong> = validation bits per byte. It measures how many bits the model needs to predict each byte of text. Lower is better &mdash; the model is more efficient at encoding the patterns it learned.</p>
+
+            <table>
+                <tr><th>val_bpb</th><th>Quality</th><th>Interpretation</th></tr>
+                <tr><td style="color:var(--cyber-red)">&gt; 1.2</td><td>Poor</td><td>Model barely learned the data distribution</td></tr>
+                <tr><td style="color:var(--cyber-yellow)">1.0 – 1.2</td><td>Decent</td><td>Basic character/word patterns captured</td></tr>
+                <tr><td style="color:var(--cyber-green)">0.9 – 1.0</td><td>Good</td><td>Strong generation, understands grammar</td></tr>
+                <tr><td style="color:var(--cyber-cyan)">&lt; 0.9</td><td>Excellent</td><td>Near state-of-the-art for this model scale</td></tr>
+            </table>
+
+            <p><strong>Relationship to loss:</strong> val_bpb ≈ loss × (ln(2) / 8). If you're used to thinking in cross-entropy loss, just know that lower bpb = lower loss = better.</p>
+        </div>
+    </details>
+
+    <details>
+        <summary>Patterns to Look For</summary>
+        <div class="content">
+            <p>When you read the morning log, look for these signals:</p>
+
+            <div class="sub-label">Consistent Improvements</div>
+            <p>If the agent tried "increase FFN multiplier from 4x to 6x" three times with different configs, and it helped every time, that's a <strong>real signal</strong>. If it helped once out of three, it's probably noise or context-dependent.</p>
+
+            <div class="sub-label">Diminishing Returns</div>
+            <p>Watch for the agent repeatedly trying small variations (lr=2.3e-4 vs 2.4e-4 vs 2.5e-4) with minimal improvement. That means it's <strong>converged</strong> in that dimension &mdash; the remaining gains are elsewhere.</p>
+
+            <div class="sub-label">Surprising Findings</div>
+            <p>The most valuable experiments are ones that surprise you. "Smaller depth + wider FFN outperforms deeper + narrower" contradicts the common assumption that more layers = better. If autoresearch finds this, pay attention &mdash; it may transfer to Foundation-Sec-8B.</p>
+
+            <div class="sub-label">Architecture Search Space</div>
+            <div class="visual-box">
+                <div class="search-grid" id="searchGrid"></div>
+                <div class="caption">Each cell is a config (depth x width). Green = tried, low loss. Red = tried, high loss. Dark = unexplored. The agent gravitates toward green regions.</div>
+            </div>
+
+            <div class="sub-label">Record observations</div>
+            <textarea class="note-area" data-experiment="patterns" placeholder="What patterns did you notice in your results?"></textarea>
+        </div>
+    </details>
+
+    <details>
+        <summary>The 3-Run Rule</summary>
+        <div class="content">
+            <p>Machine learning experiments have <strong>inherent randomness</strong> from weight initialization, data shuffling, and dropout. A single experiment is never enough to draw conclusions.</p>
+
+            <div class="callout">
+                <p><strong>The rule:</strong> If an improvement appears in 3 out of 3 runs with different random seeds, it's real. If only 1 out of 3 shows improvement, it's noise. 2 out of 3 is borderline &mdash; run 2 more to be sure.</p>
+            </div>
+
+            <p>autoresearch handles this automatically for its best findings. When reviewing results, check whether the top improvements were verified across multiple seeds.</p>
+        </div>
+    </details>
+
+    <details>
+        <summary>Transfer to Foundation-Sec-8B</summary>
+        <div class="content">
+            <p>Not everything autoresearch discovers will transfer to your larger model. Here's what typically does and doesn't:</p>
+
+            <table>
+                <tr><th>Finding</th><th>Transfers?</th><th>Why</th></tr>
+                <tr>
+                    <td>LR schedule shape (warmup + cosine)</td>
+                    <td style="color:var(--cyber-green)">Yes</td>
+                    <td>Schedule dynamics are scale-invariant</td>
+                </tr>
+                <tr>
+                    <td>Architecture ratios (FFN/hidden)</td>
+                    <td style="color:var(--cyber-green)">Yes</td>
+                    <td>Optimal ratios are consistent across scales</td>
+                </tr>
+                <tr>
+                    <td>Optimizer choice (Muon vs AdamW)</td>
+                    <td style="color:var(--cyber-green)">Often</td>
+                    <td>If Muon wins small, it often wins large</td>
+                </tr>
+                <tr>
+                    <td>Attention patterns (sliding window)</td>
+                    <td style="color:var(--cyber-yellow)">Sometimes</td>
+                    <td>Benefits depend on sequence length needs</td>
+                </tr>
+                <tr>
+                    <td>Absolute LR value (e.g. 3.2e-4)</td>
+                    <td style="color:var(--cyber-red)">No</td>
+                    <td>Optimal LR scales with model size</td>
+                </tr>
+                <tr>
+                    <td>Absolute batch size</td>
+                    <td style="color:var(--cyber-red)">No</td>
+                    <td>Depends on dataset size and memory</td>
+                </tr>
+            </table>
+
+            <p><strong>Key insight:</strong> Transfer the <strong>directions</strong> (higher FFN ratio helps, Muon converges faster, warmup matters), not the <strong>specific numbers</strong>. The numbers need to be re-tuned for each model scale.</p>
+        </div>
+    </details>
+
+    <!-- MORNING CHECKLIST -->
+    <div class="section-header">
+        <span>Morning Checklist</span>
+        <span class="line"></span>
+    </div>
+
+    <details open>
+        <summary>When You Wake Up</summary>
+        <div class="content">
+            <p>Follow this checklist to efficiently review overnight results:</p>
+            <ul class="checklist">
+                <li><input type="checkbox" id="m1"><label for="m1">Check if experiments are still running (<code>tmux attach</code>)</label></li>
+                <li><input type="checkbox" id="m2"><label for="m2">Review val_bpb column &mdash; sort by best results</label></li>
+                <li><input type="checkbox" id="m3"><label for="m3">Look for crashed experiments (OOM, NaN, error logs)</label></li>
+                <li><input type="checkbox" id="m4"><label for="m4">Identify the top 3 improvements over baseline</label></li>
+                <li><input type="checkbox" id="m5"><label for="m5">Check if any improvements stack with each other</label></li>
+                <li><input type="checkbox" id="m6"><label for="m6">Note which changes the agent tried but rejected</label></li>
+                <li><input type="checkbox" id="m7"><label for="m7">Write a 1-paragraph summary of what you learned</label></li>
+            </ul>
+
+            <div class="sub-label">Summary</div>
+            <textarea class="note-area" data-experiment="morning_summary" placeholder="Write your morning summary here. What did autoresearch discover? What surprised you? What will you try on Foundation-Sec-8B?"></textarea>
+
+            <p style="margin-top:16px">Done? Take what you learned and apply it to <a href="/train" style="color:var(--cyber-green)">Foundation-Sec-8B training &rarr;</a></p>
+        </div>
+    </details>
+
+</div>
+
+<script>
+// Copy button
+function copyCode(btn) {
+    const code = btn.parentElement.querySelector('code');
+    navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = code.textContent;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+}
+
+// Notes persistence
+document.querySelectorAll('.note-area').forEach(el => {
+    const key = 'autoresearch_note_' + el.dataset.experiment;
+    el.value = localStorage.getItem(key) || '';
+    el.addEventListener('input', () => localStorage.setItem(key, el.value));
+});
+
+// Checklist persistence
+document.querySelectorAll('.checklist input[type="checkbox"]').forEach(el => {
+    const key = 'autoresearch_check_' + el.id;
+    el.checked = localStorage.getItem(key) === 'true';
+    el.addEventListener('change', () => localStorage.setItem(key, el.checked));
+});
+
+// Attention pattern visualizations
+function buildAttnGrid(id, fn) {
+    const grid = document.getElementById(id);
+    if (!grid) return;
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'attn-cell';
+            cell.style.background = fn(r, c) ? 'var(--cyber-green)' : '#1a1a28';
+            cell.style.opacity = fn(r, c) ? '0.7' : '1';
+            grid.appendChild(cell);
+        }
+    }
+}
+
+// Causal: attend to current and all previous
+buildAttnGrid('attnCausal', (r, c) => c <= r);
+// Sliding window: attend to 3 tokens back
+buildAttnGrid('attnWindow', (r, c) => c <= r && c >= r - 2);
+// Banded SSSL: rows 0-2 short window, row 3 full
+buildAttnGrid('attnBanded', (r, c) => {
+    if (r % 4 === 3) return c <= r; // Long layer: full causal
+    return c <= r && c >= r - 2;     // Short layers: window
+});
+
+// Architecture search grid visualization
+const searchGrid = document.getElementById('searchGrid');
+if (searchGrid) {
+    const explored = new Set();
+    // Simulate explored configs
+    for (let i = 0; i < 30; i++) {
+        explored.add(Math.floor(Math.random() * 100));
+    }
+    for (let i = 0; i < 100; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'search-cell';
+        if (explored.has(i)) {
+            // Explored: color by "quality"
+            const quality = Math.random();
+            if (quality > 0.6) {
+                cell.style.background = `rgba(0, 255, 136, ${0.3 + quality * 0.5})`;
+            } else {
+                cell.style.background = `rgba(255, 68, 102, ${0.2 + (1 - quality) * 0.3})`;
+            }
+        } else {
+            cell.style.background = '#1a1a28';
+        }
+        searchGrid.appendChild(cell);
+    }
+}
+</script>
+
+</body>
+</html>

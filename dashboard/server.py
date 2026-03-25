@@ -669,6 +669,18 @@ async def serve_stix():
     return FileResponse(STATIC_DIR / "stix_graph.html")
 
 
+@app.get("/learn/nanogpt")
+async def serve_learn_nanogpt():
+    """Serve the nanoGPT tutorial page."""
+    return FileResponse(STATIC_DIR / "learn_nanogpt.html")
+
+
+@app.get("/learn/autoresearch")
+async def serve_learn_autoresearch():
+    """Serve the autoresearch tutorial page."""
+    return FileResponse(STATIC_DIR / "learn_autoresearch.html")
+
+
 @app.get("/static/{filename}")
 async def serve_static(filename: str):
     """Serve static assets."""
