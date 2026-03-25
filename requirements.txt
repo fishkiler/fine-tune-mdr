@@ -1,0 +1,33 @@
+# ============================================================================
+# Fine-Tune MDR — Additional Dependencies
+# ============================================================================
+# For use INSIDE the Unsloth Docker container, which already provides:
+#   torch, transformers, trl, unsloth, peft, bitsandbytes, datasets, accelerate
+# ============================================================================
+
+# --- Dashboard + Inference servers ---
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+sse-starlette>=1.8.0
+
+# --- Evaluation + Calibration ---
+scikit-learn>=1.3.0
+matplotlib>=3.8.0
+
+# --- GPU monitoring ---
+pynvml>=11.5.0
+
+# --- Config + Environment ---
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# --- Async HTTP (dashboard callback) ---
+httpx>=0.25.0
+
+# --- Training logs ---
+tensorboard>=2.15.0
+
+# --- Data refresh (pentestds dependencies) ---
+aiohttp>=3.9.0
+aiofiles>=23.2.0
+pandas>=2.1.0

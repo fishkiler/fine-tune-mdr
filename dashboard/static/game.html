@@ -1,0 +1,1682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TARS Game Adapter — Training Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* ============================================================
+           Dark Arcade Theme
+           ============================================================ */
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a25;
+            --border: #1e1e2e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #8888aa;
+            --text-muted: #555577;
+            --arcade-green: #00ff88;
+            --arcade-green-dim: #00cc6a;
+            --arcade-blue: #00aaff;
+            --arcade-red: #ff4466;
+            --arcade-yellow: #ffaa00;
+            --arcade-purple: #aa66ff;
+            --arcade-cyan: #00ffdd;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ============================================================
+           Top Bar
+           ============================================================ */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--arcade-cyan);
+        }
+
+        .game-tag {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: var(--arcade-yellow);
+            color: var(--bg-primary);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .status-waiting { background: var(--text-muted); color: var(--bg-primary); }
+        .status-training { background: var(--arcade-green); color: var(--bg-primary); animation: pulse 2s infinite; }
+        .status-complete { background: var(--arcade-blue); color: var(--bg-primary); }
+        .status-error { background: var(--arcade-red); color: white; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .model-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+        }
+
+        .model-name {
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        .model-detail {
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        /* ============================================================
+           Connection indicator
+           ============================================================ */
+        .connection {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--arcade-red);
+        }
+        .connection-dot.connected { background: var(--arcade-green); }
+
+        /* ============================================================
+           Layout
+           ============================================================ */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* ============================================================
+           Metric Cards
+           ============================================================ */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            transition: border-color 0.2s;
+        }
+        .card:hover { border-color: var(--arcade-cyan); }
+
+        .card-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--arcade-green);
+        }
+        .card-value.blue { color: var(--arcade-blue); }
+        .card-value.yellow { color: var(--arcade-yellow); }
+        .card-value.purple { color: var(--arcade-purple); }
+        .card-value.cyan { color: var(--arcade-cyan); }
+
+        .card-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Temperature colors */
+        .temp-green { color: var(--arcade-green) !important; }
+        .temp-yellow { color: var(--arcade-yellow) !important; }
+        .temp-red { color: var(--arcade-red) !important; }
+
+        /* ============================================================
+           Progress Bars
+           ============================================================ */
+        .progress-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .progress-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .progress-label { color: var(--text-secondary); }
+        .progress-value { color: var(--text-primary); }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .progress-fill.green { background: var(--arcade-green); }
+        .progress-fill.blue { background: var(--arcade-blue); }
+        .progress-fill.cyan { background: var(--arcade-cyan); }
+        .progress-fill.yellow { background: var(--arcade-yellow); }
+
+        /* ============================================================
+           Charts
+           ============================================================ */
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+
+        .chart-container.large {
+            height: 350px;
+        }
+
+        /* ============================================================
+           Tooltips
+           ============================================================ */
+        .tip-wrap {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1px solid var(--text-muted);
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: bold;
+            cursor: help;
+            margin-left: 6px;
+            vertical-align: middle;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .tip-icon:hover {
+            border-color: var(--arcade-cyan);
+            color: var(--arcade-cyan);
+            background: rgba(0,255,221,0.1);
+        }
+
+        .tip-content {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 320px;
+            padding: 12px 14px;
+            background: #1a1a28;
+            border: 1px solid var(--arcade-cyan);
+            border-radius: 8px;
+            font-size: 11px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+        .tip-content::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--arcade-cyan);
+        }
+        .tip-wrap:hover .tip-content { display: block; }
+
+        .tip-content strong {
+            color: var(--text-primary);
+        }
+
+        .tip-ranges {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+        }
+        .tip-range {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 3px;
+            font-size: 10px;
+        }
+        .tip-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .tip-dot.excellent { background: var(--arcade-green); }
+        .tip-dot.good { background: var(--arcade-blue); }
+        .tip-dot.normal { background: var(--arcade-yellow); }
+        .tip-dot.bad { background: var(--arcade-red); }
+
+        /* ============================================================
+           Training Report
+           ============================================================ */
+        .report-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .report-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .report-title {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--arcade-cyan);
+        }
+
+        .report-verdict {
+            padding: 4px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .verdict-excellent { background: var(--arcade-green); color: var(--bg-primary); }
+        .verdict-good { background: var(--arcade-blue); color: var(--bg-primary); }
+        .verdict-normal { background: var(--arcade-yellow); color: var(--bg-primary); }
+        .verdict-bad { background: var(--arcade-red); color: white; }
+        .verdict-waiting { background: var(--text-muted); color: var(--bg-primary); }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .report-section {
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 14px;
+        }
+
+        .report-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .report-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 12px;
+        }
+
+        .report-label { color: var(--text-secondary); }
+        .report-value { color: var(--text-primary); font-weight: bold; }
+        .report-value.green { color: var(--arcade-green); }
+        .report-value.blue { color: var(--arcade-blue); }
+        .report-value.yellow { color: var(--arcade-yellow); }
+        .report-value.red { color: var(--arcade-red); }
+        .report-value.cyan { color: var(--arcade-cyan); }
+
+        .report-insight {
+            margin-top: 12px;
+            padding: 10px 12px;
+            background: rgba(0, 255, 221, 0.05);
+            border-left: 3px solid var(--arcade-cyan);
+            border-radius: 0 6px 6px 0;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+
+        .report-insight strong {
+            color: var(--text-primary);
+        }
+
+        /* ============================================================
+           Training Controls
+           ============================================================ */
+        .controls-section {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .control-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--arcade-cyan);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .btn-danger {
+            background: var(--arcade-red);
+            color: white;
+        }
+        .btn-danger:hover:not(:disabled) {
+            background: #ff6688;
+        }
+
+        .process-badge {
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+        .pb-idle { background: var(--text-muted); color: var(--bg-primary); }
+        .pb-running { background: var(--arcade-green); color: var(--bg-primary); animation: pulse 2s infinite; }
+        .pb-stopping { background: var(--arcade-yellow); color: var(--bg-primary); animation: pulse 1s infinite; }
+        .pb-complete { background: var(--arcade-blue); color: var(--bg-primary); }
+        .pb-error { background: var(--arcade-red); color: white; }
+
+        /* ============================================================
+           Log Panel
+           ============================================================ */
+        .log-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .log-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        .log-output {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 11px;
+            line-height: 1.5;
+            max-height: 300px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .log-output .log-empty {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .log-output div {
+            color: var(--text-secondary);
+        }
+        .log-error { color: var(--arcade-red) !important; }
+        .log-warning { color: var(--arcade-yellow) !important; }
+        .log-success { color: var(--arcade-green) !important; }
+        .log-info { color: var(--arcade-blue) !important; }
+
+        /* ============================================================
+           Nav link
+           ============================================================ */
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 12px;
+            transition: color 0.2s;
+        }
+        .nav-link:hover { color: var(--arcade-cyan); }
+
+        /* ============================================================
+           Responsive
+           ============================================================ */
+        @media (max-width: 900px) {
+            .charts-row { grid-template-columns: 1fr; }
+            .controls-section { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ============================================================
+         Top Bar
+         ============================================================ -->
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <span class="logo">TARS Game Adapter Training</span>
+            <span id="gameTag" class="game-tag">--</span>
+            <span id="statusBadge" class="status-badge status-waiting">Waiting</span>
+        </div>
+        <div class="top-bar-right">
+            <div class="model-info">
+                <span class="model-name" id="modelName">--</span>
+                <span class="model-detail" id="modelDetail"></span>
+            </div>
+            <span id="elapsed">00:00:00</span>
+            <div class="connection">
+                <div id="connDot" class="connection-dot"></div>
+                <span id="connLabel">Disconnected</span>
+            </div>
+            <a href="/" class="nav-link">MDR Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- ============================================================
+             Metric Cards
+             ============================================================ -->
+        <div class="cards">
+            <div class="card">
+                <div class="card-label">Step
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Training Step</strong><br>
+                            One optimizer step = one weight update. Each step processes <em>effective_batch_size</em> examples (batch_size &times; gradient_accumulation_steps). Total steps = (dataset_size / effective_batch) &times; epochs. More steps means more passes over the data.
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value cyan" id="cardStep">--</div>
+                <div class="card-sub" id="cardStepSub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">Loss
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Training Loss</strong><br>
+                            Measures how wrong the model's predictions are. Lower is better. For game adapters, this measures how well the model predicts the correct action given a game frame. Loss should decrease rapidly in the first epoch and then plateau.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &lt;0.2 — Converged, model has learned the mapping</div>
+                                <div class="tip-range"><span class="tip-dot good"></span> 0.2&ndash;0.5 — Good, still refining predictions</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 0.5&ndash;1.5 — Normal for early training</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;1.5 — High, check data or learning rate</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value" id="cardLoss">--</div>
+                <div class="card-sub" id="cardLossSub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">Learning Rate
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Learning Rate</strong><br>
+                            Controls how much the model's weights change per step. Uses a cosine schedule: warms up from 0 to peak (e.g. 2e-4) over the first ~100 steps, then gradually decays toward zero. Too high causes instability (loss spikes), too low means the model stops learning. The schedule is automatic &mdash; no intervention needed.
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value blue" id="cardLR">--</div>
+                <div class="card-sub" id="cardLRSub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">Speed
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Training Speed</strong><br>
+                            Samples processed per second. For VLM (vision-language) training, speed is limited by image loading and processing through the vision encoder, not just GPU compute. Speed does not affect model quality &mdash; it only determines how long training takes. Typical for a 9B VLM on DGX Spark: 1&ndash;3 samples/sec.
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value yellow" id="cardSpeed">--</div>
+                <div class="card-sub">samples/sec</div>
+            </div>
+            <div class="card">
+                <div class="card-label">GPU Memory
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>GPU Memory Allocated</strong><br>
+                            How much GPU memory the model, optimizer states, and activations are using. On DGX Spark's unified memory (128 GB shared CPU/GPU), this is the CUDA-allocated portion. Memory usage is mostly constant after the first few steps. If it exceeds 85% of available CUDA memory, the NVIDIA driver can deadlock on OOM &mdash; the training script caps usage at 85% to prevent this.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &lt;70% — Plenty of headroom</div>
+                                <div class="tip-range"><span class="tip-dot good"></span> 70&ndash;85% — Comfortable</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 85&ndash;95% — Tight, risk of OOM</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;95% — Critical, may crash</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value purple" id="cardGpuMem">--</div>
+                <div class="card-sub" id="cardGpuMemSub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">GPU Temp
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>GPU Temperature</strong><br>
+                            GPU die temperature from the NVIDIA driver. Training keeps the GPU under sustained load, generating heat. GPUs can safely run hotter than CPUs, but sustained high temps reduce hardware lifespan and may trigger thermal throttling (reducing speed).
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &lt;65&deg;C — Cool</div>
+                                <div class="tip-range"><span class="tip-dot good"></span> 65&ndash;75&deg;C — Normal under load</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 75&ndash;85&deg;C — Warm, still safe</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;85&deg;C — Hot, may throttle</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value" id="cardGpuTemp">--</div>
+                <div class="card-sub">°C</div>
+            </div>
+            <div class="card">
+                <div class="card-label">CPU Temp
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>CPU Temperature</strong><br>
+                            Hottest reading across ACPI thermal zones (includes VRMs and chipset, not just CPU die). During VLM training the CPU handles data loading, image preprocessing, and feeding batches to the GPU. High CPU temps usually mean the dataloader workers are saturating the CPU.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &lt;60&deg;C — Cool</div>
+                                <div class="tip-range"><span class="tip-dot good"></span> 60&ndash;70&deg;C — Normal under load</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 70&ndash;80&deg;C — Warm</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;80&deg;C — Hot, check cooling</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value" id="cardCpuTemp">--</div>
+                <div class="card-sub">°C</div>
+            </div>
+            <div class="card">
+                <div class="card-label">ETA
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Estimated Time Remaining</strong><br>
+                            Time until training completes all scheduled steps, based on a rolling average of recent step durations. May fluctuate early on (warmup, JIT compilation) and stabilize after ~50 steps. Note: this shows time to <em>scheduled</em> completion &mdash; if the model has already converged, the remaining time is wasted compute. Check the Training Report for convergence status.
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value purple" id="cardETA">--</div>
+                <div class="card-sub" id="cardETASub"></div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Progress Bars
+             ============================================================ -->
+        <div class="progress-section">
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-label">Step Progress
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content" style="left:0;transform:none;">
+                                <strong>Step Progress</strong><br>
+                                Percentage of total optimizer steps completed. Total steps = (training_examples / effective_batch_size) &times; epochs. Each step updates the LoRA adapter weights once. The bar fills linearly &mdash; but model quality typically improves logarithmically (fast gains early, diminishing returns later).
+                            </span>
+                        </span>
+                    </span>
+                    <span class="progress-value" id="stepText">-- / --</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill cyan" id="stepFill" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-label">Epoch Progress
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content">
+                                <strong>Epoch Progress</strong><br>
+                                One epoch = one full pass through all training examples. Multiple epochs let the model see each example several times, reinforcing learning. However, too many epochs leads to overfitting &mdash; the model memorizes training data instead of generalizing. For game adapters with repetitive frame data, 2&ndash;3 epochs is usually sufficient.
+                            </span>
+                        </span>
+                    </span>
+                    <span class="progress-value" id="epochText">-- / --</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill green" id="epochFill" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-label">GPU Memory
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content" style="left:auto;right:0;transform:none;">
+                                <strong>GPU Memory Usage</strong><br>
+                                CUDA-allocated memory as a fraction of total available GPU memory. Includes model weights (frozen base + trainable LoRA), optimizer states (AdamW keeps 2 copies of LoRA params), gradients, and activations. Gradient checkpointing trades compute for memory by recomputing activations during backward pass instead of storing them.
+                            </span>
+                        </span>
+                    </span>
+                    <span class="progress-value" id="gpuText">-- / -- GB</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill yellow" id="gpuFill" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Training Report
+             ============================================================ -->
+        <div class="report-panel" id="reportPanel" style="display:none;">
+            <div class="report-header">
+                <span class="report-title">Training Report
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content" style="left:0;transform:none;">
+                            <strong>Training Report</strong><br>
+                            Live analysis of training health. The verdict badge summarizes overall status: <strong>Converged</strong> means loss has plateaued and further training yields no improvement (consider stopping early). <strong>Excellent/Good</strong> means training is progressing well. <strong>Needs Attention</strong> means something may be wrong. The insight text at the bottom provides specific, actionable recommendations based on current metrics.
+                        </span>
+                    </span>
+                </span>
+                <span id="reportVerdict" class="report-verdict verdict-waiting">Analyzing...</span>
+            </div>
+            <div class="report-grid">
+                <div class="report-section">
+                    <div class="report-section-title">Convergence
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content" style="left:0;transform:none;">
+                                <strong>Convergence Analysis</strong><br>
+                                Tracks whether the model has finished learning. <strong>Current Loss</strong> is the latest training loss. <strong>Min Loss</strong> is the lowest loss seen and the step it occurred at. <strong>Loss Trend</strong> compares the average loss over the last 10 steps vs the 10 before that &mdash; "Plateaued" means &lt;2% change, indicating convergence. <strong>Gradient Norm</strong> measures the magnitude of weight updates &mdash; small norms (&lt;1) mean the model has little left to learn. <strong>Convergence Point</strong> is the first step where loss dropped below 0.2.
+                            </span>
+                        </span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Current Loss</span>
+                        <span class="report-value green" id="rptLoss">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Min Loss</span>
+                        <span class="report-value cyan" id="rptMinLoss">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Loss Trend (last 50)</span>
+                        <span class="report-value" id="rptTrend">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Gradient Norm</span>
+                        <span class="report-value" id="rptGrad">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Convergence Point</span>
+                        <span class="report-value cyan" id="rptConvergeStep">--</span>
+                    </div>
+                </div>
+                <div class="report-section">
+                    <div class="report-section-title">Progress
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content">
+                                <strong>Training Progress</strong><br>
+                                Tracks how far training has progressed and how much remains. <strong>Epoch</strong> counts full passes over the dataset. <strong>Elapsed/ETA</strong> show wall-clock time spent and estimated remaining. <strong>Speed</strong> is throughput in samples per second. <strong>Steps Since Improvement</strong> counts how many steps have passed since the loss last decreased meaningfully (&gt;0.001) &mdash; if this is very high (1000+), the model has converged and further training is wasted compute.
+                            </span>
+                        </span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Epoch</span>
+                        <span class="report-value blue" id="rptEpoch">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Elapsed</span>
+                        <span class="report-value" id="rptElapsed">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">ETA</span>
+                        <span class="report-value" id="rptETA">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Speed</span>
+                        <span class="report-value yellow" id="rptSpeed">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Steps Since Improvement</span>
+                        <span class="report-value" id="rptStale">--</span>
+                    </div>
+                </div>
+                <div class="report-section">
+                    <div class="report-section-title">Resources
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content" style="left:auto;right:0;transform:none;">
+                                <strong>System Resources</strong><br>
+                                Hardware utilization during training. <strong>GPU Memory</strong> shows CUDA allocation vs total &mdash; on DGX Spark this is unified with CPU memory. <strong>GPU/CPU Temp</strong> indicate thermal state &mdash; sustained high temps may cause throttling. <strong>Learning Rate</strong> shows the current LR from the cosine schedule. <strong>Effective Batch</strong> is per_device_batch &times; gradient_accumulation_steps &mdash; this is how many examples contribute to each weight update. Larger batches give smoother gradients but use more memory.
+                            </span>
+                        </span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">GPU Memory</span>
+                        <span class="report-value" id="rptGpuMem">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">GPU Temp</span>
+                        <span class="report-value" id="rptGpuTemp">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">CPU Temp</span>
+                        <span class="report-value" id="rptCpuTemp">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Learning Rate</span>
+                        <span class="report-value blue" id="rptLR">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Effective Batch</span>
+                        <span class="report-value" id="rptBatch">--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="report-insight" id="reportInsight">
+                Waiting for training data to generate report...
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Charts
+             ============================================================ -->
+        <div class="charts">
+            <!-- Loss chart — primary, full width, large -->
+            <div class="chart-card full-width">
+                <div class="chart-title">Loss Curve
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content" style="left:0;transform:none;">
+                            <strong>Loss Curve</strong><br>
+                            The most important chart for monitoring training. The faint line shows raw per-step loss (noisy), and the bold line shows an exponential moving average (EMA, &alpha;=0.1) for the true trend. A healthy loss curve drops steeply in the first epoch, then gradually flattens. If the curve is flat from the start, the learning rate may be too low. If it spikes or oscillates wildly, the learning rate may be too high. Once the EMA line is flat for 500+ steps, the model has converged.
+                        </span>
+                    </span>
+                </div>
+                <div class="chart-container large">
+                    <canvas id="lossChart"></canvas>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-title">Learning Rate Schedule
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content" style="left:0;transform:none;">
+                                <strong>Learning Rate Schedule</strong><br>
+                                Shows the cosine annealing schedule. The LR starts at 0, rises to peak during warmup (first ~100 steps), then smoothly decays following a cosine curve toward 0 by the final step. This schedule helps: high LR early for fast learning, low LR late for fine-grained refinement. The shape should be a smooth arch &mdash; any discontinuities indicate a training restart or checkpoint resume.
+                            </span>
+                        </span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="lrChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">GPU Memory (GB)
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content" style="left:auto;right:0;transform:none;">
+                                <strong>GPU Memory Over Time</strong><br>
+                                Tracks CUDA memory allocation across training. Memory typically jumps at step 0 (model loading), rises slightly during the first few steps (optimizer state initialization, activation caching), then remains nearly flat. A gradual upward drift may indicate a memory leak. Sudden spikes followed by drops are garbage collection events. If the line approaches the memory cap (set at 85% of total), training is at risk of OOM.
+                            </span>
+                        </span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="gpuChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Training Controls + Log
+             ============================================================ -->
+        <div class="controls-section">
+            <div class="control-panel">
+                <span class="control-title">Training Control
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content" style="left:0;transform:none;">
+                            <strong>Training Control</strong><br>
+                            Stop sends a <strong>SIGINT</strong> (cooperative shutdown signal) to the training process. The trainer finishes its current step, saves a full checkpoint (model weights, optimizer state, scheduler state, RNG), then exits cleanly. This checkpoint can be resumed later with <code>--resume</code>. A second SIGINT forces an emergency save and immediate exit. The process badge shows: <strong>Idle</strong> (not started from dashboard), <strong>Running</strong>, <strong>Stopping</strong> (SIGINT sent, saving), <strong>Complete</strong>, or <strong>Error</strong>.
+                        </span>
+                    </span>
+                </span>
+                <span id="processBadge" class="process-badge pb-idle">Idle</span>
+                <button class="btn btn-danger" id="btnStop" onclick="stopTraining()" disabled>
+                    Stop Training
+                </button>
+                <div style="font-size:10px; color:var(--text-muted); line-height:1.4;">
+                    Sends SIGINT for cooperative shutdown. Model saves checkpoint before exit.
+                </div>
+            </div>
+            <div class="log-panel">
+                <div class="log-header">
+                    <span class="log-title">Training Log
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content" style="left:0;transform:none;">
+                                <strong>Training Log</strong><br>
+                                Live training activity feed. Shows a summary line every 10 steps with loss, learning rate, speed, GPU memory, temperature, and ETA. When training is started from the dashboard, also streams full stdout/stderr (model loading, checkpoint saves, errors). Lines are color-coded: <span style="color:var(--arcade-red)">red</span> for errors/tracebacks, <span style="color:var(--arcade-yellow)">yellow</span> for warnings, <span style="color:var(--arcade-green)">green</span> for success messages (saves, completion), <span style="color:var(--arcade-blue)">blue</span> for info. Auto-scrolls to latest output.
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="log-output" id="trainLog">
+                    <span class="log-empty">Waiting for metrics stream...</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ============================================================
+        // Chart Setup
+        // ============================================================
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 0 },
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    grid: { color: '#1e1e2e' },
+                    ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } },
+                },
+                y: {
+                    grid: { color: '#1e1e2e' },
+                    ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } },
+                },
+            },
+        };
+
+        function makeChart(id, color, yLabel, showEMA = false) {
+            const ctx = document.getElementById(id).getContext('2d');
+            const datasets = [{
+                data: [],
+                borderColor: showEMA ? color + '4D' : color,
+                backgroundColor: showEMA ? color + '1A' : color + '20',
+                borderWidth: showEMA ? 1 : 1.5,
+                pointRadius: 0,
+                fill: true,
+                tension: 0.3,
+            }];
+            if (showEMA) {
+                datasets.push({
+                    data: [],
+                    borderColor: color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.3,
+                });
+            }
+            return new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        ...chartDefaults.scales,
+                        y: {
+                            ...chartDefaults.scales.y,
+                            title: { display: true, text: yLabel, color: '#555577', font: { size: 10 } },
+                        },
+                    },
+                },
+            });
+        }
+
+        const lossChart = makeChart('lossChart', '#00ff88', 'Loss', true);
+        const lrChart = makeChart('lrChart', '#00aaff', 'LR');
+        const gpuChart = makeChart('gpuChart', '#aa66ff', 'GB');
+
+        const EMA_ALPHA = 0.1;
+        const emaState = new Map();
+
+        function pushPoint(chart, step, value, maxPoints = 500) {
+            if (value == null || value === undefined) return;
+            chart.data.labels.push(step);
+            chart.data.datasets[0].data.push(value);
+            if (chart.data.datasets.length > 1) {
+                const prev = emaState.get(chart);
+                const ema = prev == null ? value : EMA_ALPHA * value + (1 - EMA_ALPHA) * prev;
+                emaState.set(chart, ema);
+                chart.data.datasets[1].data.push(ema);
+            }
+            if (chart.data.labels.length > maxPoints) {
+                const skip = Math.floor(chart.data.labels.length / maxPoints);
+                chart.data.labels = chart.data.labels.filter((_, i) => i % skip === 0);
+                for (const ds of chart.data.datasets) {
+                    ds.data = ds.data.filter((_, i) => i % skip === 0);
+                }
+            }
+            chart.update('none');
+        }
+
+        // ============================================================
+        // State
+        // ============================================================
+        let config = {};
+        let lastLogStep = -1;
+        const LOG_EVERY_N_STEPS = 10;  // log a summary line every N steps
+        let startTime = null;
+        let elapsedInterval = null;
+
+        // ============================================================
+        // Time Formatting
+        // ============================================================
+        function fmtTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+        }
+
+        function startElapsedTimer() {
+            if (elapsedInterval) return;
+            elapsedInterval = setInterval(() => {
+                if (startTime) {
+                    const elapsed = (Date.now() / 1000) - startTime;
+                    document.getElementById('elapsed').textContent = fmtTime(elapsed);
+                }
+            }, 1000);
+        }
+
+        // ============================================================
+        // UI Updates
+        // ============================================================
+        function setStatus(status) {
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'status-badge status-' + status;
+            badge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+
+        function setConnection(connected) {
+            document.getElementById('connDot').className = 'connection-dot' + (connected ? ' connected' : '');
+            document.getElementById('connLabel').textContent = connected ? 'Connected' : 'Disconnected';
+        }
+
+        function updateConfig(data) {
+            // Try to extract game and model info from config
+            const modelName = data.model_name || data.model || '';
+            const gameName = data.game_name || '';
+
+            if (modelName) {
+                document.getElementById('modelName').textContent = modelName;
+            }
+            if (gameName) {
+                document.getElementById('gameTag').textContent = gameName;
+            } else if (modelName) {
+                // Try to infer game from model/adapter name
+                const lower = modelName.toLowerCase();
+                if (lower.includes('pac') || lower.includes('pacman')) {
+                    document.getElementById('gameTag').textContent = 'PAC-MAN';
+                } else if (lower.includes('defend')) {
+                    document.getElementById('gameTag').textContent = 'DEFENDER';
+                }
+            }
+
+            // Show adapter/LoRA info
+            const detail = [];
+            if (data.lora_rank) detail.push('r=' + data.lora_rank);
+            if (data.lora_alpha) detail.push('α=' + data.lora_alpha);
+            if (data.num_epochs) detail.push(data.num_epochs + ' epochs');
+            if (detail.length) {
+                document.getElementById('modelDetail').textContent = detail.join(' · ');
+            }
+        }
+
+        function tempColor(c) {
+            if (c == null) return '';
+            if (c < 60) return 'temp-green';
+            if (c < 75) return 'temp-yellow';
+            return 'temp-red';
+        }
+
+        function processEvent(data) {
+            const event = data.event;
+
+            if (event === 'train_begin') {
+                config = data;
+                startTime = data.timestamp;
+                setStatus('training');
+                startElapsedTimer();
+                updateConfig(data);
+                appendLog('[INFO] Training started — ' + (data.model_name || data.model || 'model') +
+                    ', ' + (data.num_epochs || '?') + ' epochs, ' + (data.max_steps || '?') + ' steps');
+                return;
+            }
+
+            if (event === 'train_end') {
+                setStatus('complete');
+                if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
+                appendLog('[INFO] Training complete.');
+                return;
+            }
+
+            if (event !== 'metrics') return;
+
+            const step = data.step || 0;
+            const maxSteps = data.max_steps || config.max_steps || 1;
+            const numEpochs = config.num_epochs || 1;
+
+            // Step card
+            document.getElementById('cardStep').textContent = step;
+            document.getElementById('cardStepSub').textContent = 'of ' + maxSteps;
+
+            // Loss card
+            if (data.loss != null) {
+                document.getElementById('cardLoss').textContent = data.loss.toFixed(4);
+            }
+
+            // LR card
+            if (data.learning_rate != null) {
+                document.getElementById('cardLR').textContent = data.learning_rate.toExponential(2);
+            }
+
+            // Speed card
+            if (data.samples_per_sec != null) {
+                document.getElementById('cardSpeed').textContent = data.samples_per_sec.toFixed(1);
+            }
+
+            // GPU Memory card
+            if (data.gpu_memory_allocated_gb != null) {
+                document.getElementById('cardGpuMem').textContent = data.gpu_memory_allocated_gb.toFixed(1);
+                if (data.gpu_memory_total_gb) {
+                    document.getElementById('cardGpuMemSub').textContent =
+                        'of ' + data.gpu_memory_total_gb.toFixed(1) + ' GB';
+                }
+            }
+
+            // Temperature cards
+            if (data.gpu_temp_c != null) {
+                const el = document.getElementById('cardGpuTemp');
+                el.textContent = Math.round(data.gpu_temp_c);
+                el.className = 'card-value ' + tempColor(data.gpu_temp_c);
+            }
+            if (data.cpu_temp_c != null) {
+                const el = document.getElementById('cardCpuTemp');
+                el.textContent = Math.round(data.cpu_temp_c);
+                el.className = 'card-value ' + tempColor(data.cpu_temp_c);
+            }
+
+            // ETA card
+            if (data.eta_seconds != null && data.eta_seconds > 0) {
+                document.getElementById('cardETA').textContent = fmtTime(data.eta_seconds);
+            }
+
+            // Progress bars
+            const stepPct = Math.min(100, (step / maxSteps) * 100);
+            document.getElementById('stepFill').style.width = stepPct + '%';
+            document.getElementById('stepText').textContent = step + ' / ' + maxSteps;
+
+            const epoch = data.epoch || 0;
+            const epochPct = Math.min(100, (epoch / numEpochs) * 100);
+            document.getElementById('epochFill').style.width = epochPct + '%';
+            document.getElementById('epochText').textContent = epoch.toFixed(2) + ' / ' + numEpochs;
+
+            if (data.gpu_memory_allocated_gb != null && data.gpu_memory_total_gb) {
+                const gpuPct = (data.gpu_memory_allocated_gb / data.gpu_memory_total_gb) * 100;
+                document.getElementById('gpuFill').style.width = gpuPct + '%';
+                document.getElementById('gpuText').textContent =
+                    data.gpu_memory_allocated_gb.toFixed(1) + ' / ' + data.gpu_memory_total_gb.toFixed(1) + ' GB';
+            }
+
+            // Charts
+            pushPoint(lossChart, step, data.loss);
+            pushPoint(lrChart, step, data.learning_rate);
+            pushPoint(gpuChart, step, data.gpu_memory_allocated_gb);
+
+            // Training report
+            updateReport(data);
+
+            // Periodic log line from metrics stream
+            if (step - lastLogStep >= LOG_EVERY_N_STEPS) {
+                lastLogStep = step;
+                const parts = ['[Step ' + step + '/' + maxSteps + ']'];
+                if (data.loss != null) parts.push('loss=' + data.loss.toFixed(4));
+                if (data.learning_rate != null) parts.push('lr=' + data.learning_rate.toExponential(2));
+                if (data.samples_per_sec != null) parts.push(data.samples_per_sec.toFixed(1) + ' samp/s');
+                if (data.gpu_memory_allocated_gb != null) parts.push('gpu=' + data.gpu_memory_allocated_gb.toFixed(1) + 'GB');
+                if (data.gpu_temp_c != null) parts.push(Math.round(data.gpu_temp_c) + '°C');
+                if (data.eta_seconds != null && data.eta_seconds > 0) parts.push('eta=' + fmtTime(data.eta_seconds));
+                appendLog(parts.join('  '));
+            }
+        }
+
+        // ============================================================
+        // Training Report
+        // ============================================================
+        const reportState = {
+            lossHistory: [],
+            gradHistory: [],
+            minLoss: Infinity,
+            minLossStep: 0,
+            convergedStep: null,  // step where loss first dropped below threshold
+            lastImprovementStep: 0,
+            CONVERGE_THRESHOLD: 0.2,  // loss below this = "converged"
+            STALE_WINDOW: 50,  // steps to look back for improvement
+            IMPROVEMENT_THRESHOLD: 0.01,  // relative improvement needed
+        };
+
+        function updateReport(data) {
+            const panel = document.getElementById('reportPanel');
+            panel.style.display = '';
+
+            const loss = data.loss;
+            const step = data.step || 0;
+            const maxSteps = data.max_steps || config.max_steps || 1;
+            const numEpochs = config.num_epochs || 1;
+
+            if (loss == null) return;
+
+            // Track history
+            reportState.lossHistory.push({ step, loss });
+            if (reportState.lossHistory.length > 500) reportState.lossHistory.shift();
+
+            if (data.grad_norm != null) {
+                reportState.gradHistory.push(data.grad_norm);
+                if (reportState.gradHistory.length > 100) reportState.gradHistory.shift();
+            }
+
+            // Min loss tracking
+            if (loss < reportState.minLoss - 0.001) {
+                reportState.minLoss = loss;
+                reportState.minLossStep = step;
+                reportState.lastImprovementStep = step;
+            }
+
+            // Convergence detection
+            if (loss < reportState.CONVERGE_THRESHOLD && !reportState.convergedStep) {
+                reportState.convergedStep = step;
+            }
+
+            // --- Convergence section ---
+            document.getElementById('rptLoss').textContent = loss.toFixed(4);
+            document.getElementById('rptMinLoss').textContent =
+                reportState.minLoss.toFixed(4) + ' (step ' + reportState.minLossStep + ')';
+
+            // Loss trend
+            const hist = reportState.lossHistory;
+            let trendText = 'Collecting...';
+            let trendClass = '';
+            if (hist.length >= 20) {
+                const recent = hist.slice(-10).map(h => h.loss);
+                const older = hist.slice(-20, -10).map(h => h.loss);
+                const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+                const olderAvg = older.reduce((a, b) => a + b, 0) / older.length;
+                const change = (recentAvg - olderAvg) / olderAvg;
+                if (change < -0.10) { trendText = 'Decreasing fast'; trendClass = 'green'; }
+                else if (change < -0.02) { trendText = 'Decreasing'; trendClass = 'green'; }
+                else if (change < 0.02) { trendText = 'Plateaued'; trendClass = 'yellow'; }
+                else { trendText = 'Increasing'; trendClass = 'red'; }
+            }
+            const trendEl = document.getElementById('rptTrend');
+            trendEl.textContent = trendText;
+            trendEl.className = 'report-value' + (trendClass ? ' ' + trendClass : '');
+
+            // Gradient norm
+            if (reportState.gradHistory.length > 0) {
+                const recentGrad = reportState.gradHistory.slice(-5);
+                const avgGrad = recentGrad.reduce((a, b) => a + b, 0) / recentGrad.length;
+                const gradEl = document.getElementById('rptGrad');
+                gradEl.textContent = avgGrad.toFixed(4);
+                if (avgGrad <= 1) { gradEl.className = 'report-value green'; }
+                else if (avgGrad <= 5) { gradEl.className = 'report-value blue'; }
+                else if (avgGrad <= 15) { gradEl.className = 'report-value yellow'; }
+                else { gradEl.className = 'report-value red'; }
+            }
+
+            // Convergence point
+            const convEl = document.getElementById('rptConvergeStep');
+            if (reportState.convergedStep) {
+                convEl.textContent = 'Step ' + reportState.convergedStep;
+            } else {
+                convEl.textContent = 'Not yet';
+            }
+
+            // --- Progress section ---
+            const epoch = data.epoch || 0;
+            document.getElementById('rptEpoch').textContent =
+                epoch.toFixed(2) + ' / ' + numEpochs;
+
+            if (data.elapsed_seconds) {
+                const h = Math.floor(data.elapsed_seconds / 3600);
+                const m = Math.floor((data.elapsed_seconds % 3600) / 60);
+                document.getElementById('rptElapsed').textContent = h + 'h ' + m + 'm';
+            }
+
+            if (data.eta_seconds && data.eta_seconds > 0) {
+                const h = Math.floor(data.eta_seconds / 3600);
+                const m = Math.floor((data.eta_seconds % 3600) / 60);
+                document.getElementById('rptETA').textContent = h + 'h ' + m + 'm';
+            }
+
+            if (data.samples_per_sec) {
+                document.getElementById('rptSpeed').textContent =
+                    data.samples_per_sec.toFixed(1) + ' samples/sec';
+            }
+
+            // Steps since improvement
+            const staleness = step - reportState.lastImprovementStep;
+            const staleEl = document.getElementById('rptStale');
+            staleEl.textContent = staleness.toLocaleString() + ' steps';
+            if (staleness > 1000) { staleEl.className = 'report-value red'; }
+            else if (staleness > 500) { staleEl.className = 'report-value yellow'; }
+            else { staleEl.className = 'report-value green'; }
+
+            // --- Resources section ---
+            if (data.gpu_memory_allocated_gb && data.gpu_memory_total_gb) {
+                const pct = (data.gpu_memory_allocated_gb / data.gpu_memory_total_gb * 100).toFixed(0);
+                const memEl = document.getElementById('rptGpuMem');
+                memEl.textContent = data.gpu_memory_allocated_gb.toFixed(1) + ' / ' +
+                    data.gpu_memory_total_gb.toFixed(1) + ' GB (' + pct + '%)';
+                if (pct < 70) memEl.className = 'report-value green';
+                else if (pct < 85) memEl.className = 'report-value blue';
+                else if (pct < 95) memEl.className = 'report-value yellow';
+                else memEl.className = 'report-value red';
+            }
+
+            if (data.gpu_temp_c != null) {
+                const el = document.getElementById('rptGpuTemp');
+                el.textContent = Math.round(data.gpu_temp_c) + '°C';
+                if (data.gpu_temp_c < 70) el.className = 'report-value green';
+                else if (data.gpu_temp_c < 80) el.className = 'report-value yellow';
+                else el.className = 'report-value red';
+            }
+
+            if (data.cpu_temp_c != null) {
+                const el = document.getElementById('rptCpuTemp');
+                el.textContent = Math.round(data.cpu_temp_c) + '°C';
+                if (data.cpu_temp_c < 65) el.className = 'report-value green';
+                else if (data.cpu_temp_c < 75) el.className = 'report-value yellow';
+                else el.className = 'report-value red';
+            }
+
+            if (data.learning_rate != null) {
+                document.getElementById('rptLR').textContent = data.learning_rate.toExponential(2);
+            }
+
+            // Effective batch (from config if available)
+            const bs = config.per_device_train_batch_size || config.batch_size;
+            const ga = config.gradient_accumulation_steps;
+            if (bs && ga) {
+                document.getElementById('rptBatch').textContent = bs + ' × ' + ga + ' = ' + (bs * ga);
+            }
+
+            // --- Overall verdict & insight ---
+            generateVerdict(data, staleness, trendText);
+        }
+
+        function generateVerdict(data, staleness, trendText) {
+            const loss = data.loss;
+            const step = data.step || 0;
+            const maxSteps = data.max_steps || config.max_steps || 1;
+            const pctComplete = (step / maxSteps) * 100;
+
+            let verdict, verdictClass;
+            const insights = [];
+
+            // Determine overall verdict
+            if (loss < 0.2 && trendText === 'Plateaued' && staleness > 500) {
+                verdict = 'Converged';
+                verdictClass = 'verdict-excellent';
+                const remainSteps = maxSteps - step;
+                const remainH = (data.eta_seconds || 0) / 3600;
+                insights.push(
+                    '<strong>Training has converged.</strong> Loss plateaued at ' +
+                    loss.toFixed(4) + ' with no improvement for ' + staleness.toLocaleString() +
+                    ' steps. Remaining ' + remainSteps.toLocaleString() + ' steps (~' +
+                    remainH.toFixed(1) + 'h) will likely not improve the model.'
+                );
+                if (pctComplete < 80) {
+                    insights.push(
+                        'Consider stopping early — the model learned the task. ' +
+                        'For future runs, reduce epochs (2-3 instead of 5) or add early stopping.'
+                    );
+                }
+            } else if (loss < 0.5 && (trendText === 'Decreasing' || trendText === 'Decreasing fast')) {
+                verdict = 'Excellent';
+                verdictClass = 'verdict-excellent';
+                insights.push(
+                    '<strong>Training is going great.</strong> Loss is low and still improving.'
+                );
+            } else if (loss < 0.5) {
+                verdict = 'Good';
+                verdictClass = 'verdict-good';
+                insights.push(
+                    '<strong>Loss is low.</strong> Model has learned the task well. ' +
+                    'Monitor for overfitting if loss keeps dropping on train but not on eval.'
+                );
+            } else if (loss < 1.0) {
+                verdict = 'Learning';
+                verdictClass = 'verdict-good';
+                insights.push(
+                    '<strong>Model is actively learning.</strong> Loss is in a healthy range ' +
+                    'and should continue to decrease.'
+                );
+            } else if (loss < 2.0) {
+                verdict = 'Early Stage';
+                verdictClass = 'verdict-normal';
+                insights.push(
+                    '<strong>Still in early training.</strong> Loss should decrease as training progresses. ' +
+                    'If loss stays flat after 500+ steps, check learning rate and data quality.'
+                );
+            } else {
+                verdict = 'Needs Attention';
+                verdictClass = 'verdict-bad';
+                insights.push(
+                    '<strong>Loss is high.</strong> Check data formatting, learning rate, ' +
+                    'and that the model is receiving images correctly.'
+                );
+            }
+
+            // Additional warnings
+            if (data.gpu_temp_c && data.gpu_temp_c > 85) {
+                insights.push('GPU temperature is high (' + Math.round(data.gpu_temp_c) + '°C). Consider reducing batch size.');
+            }
+
+            const gradAvg = reportState.gradHistory.length > 0
+                ? reportState.gradHistory.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, reportState.gradHistory.length)
+                : 0;
+            if (gradAvg > 50) {
+                insights.push('Gradient norms are very high (' + gradAvg.toFixed(1) + '). Possible exploding gradients — consider gradient clipping or lower learning rate.');
+            }
+
+            // Update DOM
+            const verdictEl = document.getElementById('reportVerdict');
+            verdictEl.textContent = verdict;
+            verdictEl.className = 'report-verdict ' + verdictClass;
+
+            document.getElementById('reportInsight').innerHTML = insights.join('<br><br>');
+        }
+
+        // ============================================================
+        // SSE Connection
+        // ============================================================
+        function connect() {
+            const source = new EventSource('/metrics');
+
+            source.onopen = () => {
+                setConnection(true);
+                console.log('[Game Dashboard] SSE connected');
+            };
+
+            source.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    processEvent(data);
+                } catch (err) {
+                    console.warn('[Game Dashboard] Parse error:', err);
+                }
+            };
+
+            source.onerror = () => {
+                setConnection(false);
+                source.close();
+                console.log('[Game Dashboard] SSE disconnected — reconnecting in 3s...');
+                setTimeout(connect, 3000);
+            };
+        }
+
+        // ============================================================
+        // Training Process Control
+        // ============================================================
+        let trainLogSource = null;
+
+        function setProcessStatus(status) {
+            const badge = document.getElementById('processBadge');
+            badge.className = 'process-badge pb-' + status;
+            const labels = { idle: 'Idle', running: 'Running', stopping: 'Stopping', complete: 'Complete', error: 'Error' };
+            badge.textContent = labels[status] || status;
+
+            const isRunning = (status === 'running' || status === 'stopping');
+            document.getElementById('btnStop').disabled = !isRunning || status === 'stopping';
+        }
+
+        function appendLog(text) {
+            const log = document.getElementById('trainLog');
+            const empty = log.querySelector('.log-empty');
+            if (empty) empty.remove();
+
+            const line = document.createElement('div');
+            const lower = text.toLowerCase();
+            if (lower.includes('error') || lower.includes('failed') || lower.includes('traceback')) {
+                line.className = 'log-error';
+            } else if (lower.includes('warning') || lower.includes('warn')) {
+                line.className = 'log-warning';
+            } else if (lower.includes('completed successfully') || lower.includes('training complete') || lower.includes('saved')) {
+                line.className = 'log-success';
+            } else if (lower.includes('info')) {
+                line.className = 'log-info';
+            }
+            line.textContent = text;
+            log.appendChild(line);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function connectTrainLogs() {
+            if (trainLogSource) trainLogSource.close();
+            trainLogSource = new EventSource('/train/logs');
+
+            trainLogSource.onmessage = (e) => {
+                appendLog(e.data);
+            };
+
+            trainLogSource.onerror = () => {
+                trainLogSource.close();
+                trainLogSource = null;
+                fetch('/train/state')
+                    .then(r => r.json())
+                    .then(s => setProcessStatus(s.status))
+                    .catch(() => {});
+            };
+        }
+
+        async function stopTraining() {
+            try {
+                setProcessStatus('stopping');
+                await fetch('/train/stop', { method: 'POST' });
+            } catch (err) {
+                appendLog('Stop error: ' + err.message);
+            }
+        }
+
+        // ============================================================
+        // Initialize
+        // ============================================================
+        async function init() {
+            // Load existing state
+            try {
+                const res = await fetch('/state');
+                const state = await res.json();
+                if (state.status && state.status !== 'waiting') {
+                    setStatus(state.status);
+                }
+                if (state.config) {
+                    config = state.config;
+                    if (state.config.timestamp) {
+                        startTime = state.config.timestamp;
+                        startElapsedTimer();
+                    }
+                    updateConfig(state.config);
+                }
+            } catch (e) {
+                console.warn('[Game Dashboard] Failed to load state:', e);
+            }
+
+            // Load training process state
+            try {
+                const res = await fetch('/train/state');
+                const state = await res.json();
+                setProcessStatus(state.status);
+                if (state.status === 'running' || state.status === 'stopping') {
+                    connectTrainLogs();
+                }
+            } catch (e) {
+                console.warn('[Game Dashboard] Failed to load train process state:', e);
+            }
+
+            // Connect SSE for live metrics
+            connect();
+        }
+
+        init();
+    </script>
+</body>
+</html>

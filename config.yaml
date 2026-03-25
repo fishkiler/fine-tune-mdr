@@ -1,0 +1,254 @@
+# ============================================================================
+# Fine-Tune MDR — Central Configuration
+# ============================================================================
+# All hyperparameters, paths, and thresholds in one place.
+# Every script reads from this file to prevent drift.
+# ============================================================================
+
+# --- Model ---
+model:
+  name: "fdtn-ai/Foundation-Sec-8B-Instruct"
+  max_seq_length: 1024
+  dtype: null  # auto-detect (float16 on most GPUs)
+  load_in_4bit: false
+  chat_template: "llama-3.1"
+  attn_implementation: "flash_attention_2"  # H100 sm_90 supports FA2; use "sdpa" on DGX GB10
+
+# --- LoRA ---
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: "none"
+  use_gradient_checkpointing: true   # Free perf (<0.1% overhead), prevents OOM on edge cases
+  use_rslora: false
+  loftq_config: null
+
+# --- Dataset ---
+dataset:
+  name: "jason-oneal/mitre-stix-cve-exploitdb-dataset-alpaca-chatml-harmony"
+  config: "chatml"
+  split_ratios:
+    train: 0.90
+    val: 0.05
+    test: 0.05
+  seed: 42
+  local_dir: "data"
+
+# --- Training ---
+training:
+  output_dir: "outputs"
+  num_epochs: 2
+  per_device_train_batch_size: 32   # H100 80GB has headroom; effective batch=32 (32×1)
+  gradient_accumulation_steps: 1
+  learning_rate: 1.0e-4             # Less aggressive — reduces hallucination
+  weight_decay: 0.01
+  warmup_steps: 100                 # Longer warmup for 2-epoch run
+  lr_scheduler_type: "cosine"
+  optim: "adamw_torch"              # Standard optimizer (was: adamw_8bit for Unsloth)
+  max_steps: -1                     # Full training run
+  torch_compile: false              # Disabled — recompilation spikes hurt throughput on GB10
+  # cuda_alloc_conf and cuda_memory_fraction removed — DGX GB10-specific, not needed on H100
+  logging_steps: 1
+  save_steps: 500
+  save_total_limit: 3
+  fp16: false
+  bf16: true
+  seed: 42
+  report_to: "tensorboard"
+  logging_dir: "outputs/logs"
+  eval_strategy: "no"            # Skip eval during training (2.5h per eval on 31K val set)
+  time_limit_hours: 0            # 0 = no limit (manual stop). Set to 7.5 for nightly sessions.
+
+# --- Dashboard ---
+dashboard:
+  host: "0.0.0.0"
+  port: 28000
+  metrics_buffer_size: 10000
+
+# --- Evaluation ---
+evaluation:
+  batch_size: 8
+  max_new_tokens: 512
+  repetition_penalty: 1.1
+  results_dir: "eval_results"
+  run_baseline: false
+
+# --- Calibration ---
+calibration:
+  temperature: 1.0  # updated by calibrate.py after fitting
+  num_bins: 15
+  plot_path: "eval_results/reliability_diagram.png"
+
+# --- Inference ---
+inference:
+  host: "0.0.0.0"
+  port: 8080
+  max_new_tokens: 512
+  repetition_penalty: 1.1
+  temperature: 1.0  # overridden by calibration.temperature if calibrated
+  alert_tiers:
+    auto_alert: 0.90
+    needs_verification: 0.70
+    human_review: 0.40
+    log_only: 0.0
+
+# --- Data Refresh ---
+refresh:
+  nvd_max_days_back: 5475     # ~15 years of CVE history (full build)
+  nvd_window_days: 90          # API chunk size
+  nvd_sleep_seconds: 6         # Rate limit (lower with API key)
+  tools_dir: ".tools"          # Where pentestds repo lives
+  keep_backups: 2              # Number of data backups to retain
+
+# --- Database ---
+database:
+  path: "mdr-database/mdr_dataset.db"
+  schema_version: 2
+
+# --- Data Quality ---
+quality:
+  # Rule-based validation
+  validation:
+    run_on_ingest: true          # Auto-validate new records during ingestion
+
+  # LLM quality review
+  review:
+    model: "claude-sonnet-4-6"
+    batch_size: 5                # Records per API call
+    default_sample: 100          # Default sample size for review
+
+  # Quality thresholds by domain
+  thresholds:
+    default: 3.5
+    secure_code_review: 4.0      # Code examples need to be correct
+    cve: 3.0                     # CVE summaries are simpler
+    mitre_attack: 3.5
+    security_general: 3.5
+    log_analysis: 3.5
+    siem_queries: 4.0            # Queries must be syntactically valid
+    sigma_rules: 4.0             # Rules must be valid YAML
+
+# --- Export ---
+export:
+  gguf_quantization: "q4_k_m"
+  save_merged_16bit: true
+  save_gguf: true
+  output_dir: "outputs/exported"
+
+  # Training data export
+  training_data:
+    output_dir: "data/export"
+    quality_threshold: 3.5       # Only export records scoring >= this
+    require_validation: false    # If true, only export validated records
+    domain_weights:
+      cve: 0.08                  # Keep ~50K of 618K (top quality)
+      mitre_attack: 10.0         # 1,317 x 10 = ~13K
+      secure_code_review: 30.0   # 348 x 30 = ~10K
+      security_general: 8.0      # 1,236 x 8 = ~10K
+      apt_intel: 1.0
+      exploitdb: 1.0
+      stix_general: 1.0
+      log_analysis: 5.0          # ~1600 x 5 = ~8K
+      siem_queries: 8.0          # ~700 x 8 = ~5.6K
+      sigma_rules: 10.0          # ~700 x 10 = ~7K
+
+# --- Game Adapters ---
+game_adapters:
+  base_model: "Qwen/Qwen3.5-9B"
+  attention: "sdpa"                      # No flash attention on DGX Spark
+  precision: "bf16"                      # BF16 faster than 4-bit on Blackwell
+  torch_compile: false                   # Causes recompilation spikes on Spark
+
+  lora:
+    r: 32
+    alpha: 64
+    dropout: 0.05
+    target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+
+  training:
+    epochs: 3                             # Was 5, but converges by epoch 2
+    batch_size: 4                        # Per-device
+    gradient_accumulation_steps: 4       # Effective batch = 16
+    learning_rate: 2.0e-4
+    lr_scheduler: "cosine"
+    warmup_steps: 100
+    weight_decay: 0.01
+    max_seq_length: 256                   # Reduced image pixels keep token count low
+    gradient_checkpointing: true
+    dataloader_num_workers: 4
+
+  image:
+    min_pixels: 50176                    # 128 * 28 * 14 — Pac-Man doesn't need high res
+    max_pixels: 100352                   # 256 * 28 * 14
+
+  games:
+    pacman:
+      display_name: "Pac-Man"
+      mame_rom: "pacman"
+      frame_resolution: "552x456"
+      actions: ["NONE", "UP", "DOWN", "LEFT", "RIGHT"]
+      system_prompt: >
+        You are TARS, playing Pac-Man. Analyze the game frame and choose an action.
+        ACTIONS: NONE (continue current direction), UP, DOWN, LEFT, RIGHT
+        Respond with brief reasoning followed by: Action: <ACTION>
+      dataset_dir: "data/games/pacman/tahahah"
+      adapter_dir: "adapters/games/pacman"
+      min_score_threshold: 1000
+      action_balance:
+        max_noop_ratio: 0.25
+        decision_point_oversample: 3
+
+# --- RL Training ---
+rl_training:
+  defender:
+    env_id: "ALE/Defender-v5"
+    display_name: "Defender"
+    algorithm: "PPO"
+    total_timesteps: 1_000_000
+    n_envs: 8
+    learning_rate: 2.5e-4
+    n_steps: 128
+    batch_size: 256
+    n_epochs: 4
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_range: 0.1
+    ent_coef: 0.01
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    save_freq: 100_000
+    output_dir: "adapters/games/defender"
+
+# --- Data Sources ---
+sources:
+  pentestds:
+    enabled: true
+    repo: "https://github.com/jason-allen-oneal/pentest-dataset-builder.git"
+    tools_dir: ".tools"
+  cisa_kev:
+    enabled: false
+    url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+  mitre_stix:
+    enabled: false
+    repo: "https://github.com/mitre-attack/attack-stix-data.git"
+    branch: "master"
+  attack_logs:
+    enabled: true
+    simulator_url: "http://192.168.1.67:6971"
+    sigma_hq: true

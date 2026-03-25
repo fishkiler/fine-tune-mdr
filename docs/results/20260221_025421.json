@@ -1,0 +1,11 @@
+{
+  "total_examples": 500,
+  "valid_comparisons": 500,
+  "empty_predictions": 0,
+  "exact_match_rate": 0.006,
+  "avg_rouge1": 0.5216516134065607,
+  "avg_rouge2": 0.4057596434272334,
+  "avg_rougeL": 0.4907080674077953,
+  "num_examples_evaluated": 500,
+  "timestamp": "20260221_025421"
+}

@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TARS RL Training — Defender</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a25;
+            --border: #1e1e2e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #8888aa;
+            --text-muted: #555577;
+            --arcade-green: #00ff88;
+            --arcade-green-dim: #00cc6a;
+            --arcade-blue: #00aaff;
+            --arcade-red: #ff4466;
+            --arcade-yellow: #ffaa00;
+            --arcade-purple: #aa66ff;
+            --arcade-cyan: #00ffdd;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        .top-bar-left { display: flex; align-items: center; gap: 16px; }
+        .logo { font-size: 18px; font-weight: bold; color: var(--arcade-cyan); }
+        .game-tag {
+            padding: 4px 10px; border-radius: 6px; font-size: 11px;
+            font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            background: var(--arcade-red); color: white;
+        }
+        .algo-tag {
+            padding: 4px 10px; border-radius: 6px; font-size: 11px;
+            font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            background: var(--arcade-purple); color: white;
+        }
+        .status-badge {
+            padding: 4px 12px; border-radius: 12px; font-size: 12px;
+            font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .status-waiting { background: var(--text-muted); color: var(--bg-primary); }
+        .status-training { background: var(--arcade-green); color: var(--bg-primary); animation: pulse 2s infinite; }
+        .status-complete { background: var(--arcade-blue); color: var(--bg-primary); }
+        .status-error { background: var(--arcade-red); color: white; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        .top-bar-right {
+            display: flex; align-items: center; gap: 24px;
+            color: var(--text-secondary); font-size: 13px;
+        }
+        .connection { display: flex; align-items: center; gap: 6px; }
+        .connection-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--arcade-red); }
+        .connection-dot.connected { background: var(--arcade-green); }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px; transition: border-color 0.2s;
+        }
+        .card:hover { border-color: var(--arcade-cyan); }
+        .card-label {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-muted); margin-bottom: 8px;
+        }
+        .card-value { font-size: 28px; font-weight: bold; color: var(--arcade-green); }
+        .card-value.blue { color: var(--arcade-blue); }
+        .card-value.yellow { color: var(--arcade-yellow); }
+        .card-value.purple { color: var(--arcade-purple); }
+        .card-value.cyan { color: var(--arcade-cyan); }
+        .card-value.red { color: var(--arcade-red); }
+        .card-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+        .temp-green { color: var(--arcade-green) !important; }
+        .temp-yellow { color: var(--arcade-yellow) !important; }
+        .temp-red { color: var(--arcade-red) !important; }
+
+        .progress-section {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+        .progress-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px;
+        }
+        .progress-header {
+            display: flex; justify-content: space-between;
+            margin-bottom: 8px; font-size: 12px;
+        }
+        .progress-label { color: var(--text-secondary); }
+        .progress-value { color: var(--text-primary); }
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+        .progress-fill.green { background: var(--arcade-green); }
+        .progress-fill.cyan { background: var(--arcade-cyan); }
+
+        .charts { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 24px; }
+        .charts-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .chart-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px;
+        }
+        .chart-card.full-width { grid-column: 1 / -1; }
+        .chart-title {
+            font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-secondary); margin-bottom: 12px;
+        }
+        .chart-container { position: relative; height: 250px; }
+        .chart-container.large { height: 350px; }
+
+        .report-panel {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 20px; margin-bottom: 24px;
+        }
+        .report-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .report-title {
+            font-size: 14px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--arcade-cyan);
+        }
+        .report-verdict {
+            padding: 4px 14px; border-radius: 12px; font-size: 13px;
+            font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .verdict-excellent { background: var(--arcade-green); color: var(--bg-primary); }
+        .verdict-good { background: var(--arcade-blue); color: var(--bg-primary); }
+        .verdict-normal { background: var(--arcade-yellow); color: var(--bg-primary); }
+        .verdict-bad { background: var(--arcade-red); color: white; }
+        .verdict-waiting { background: var(--text-muted); color: var(--bg-primary); }
+
+        .report-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;
+        }
+        .report-section { background: var(--bg-primary); border-radius: 6px; padding: 14px; }
+        .report-section-title {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-muted); margin-bottom: 10px;
+        }
+        .report-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 4px 0; font-size: 12px;
+        }
+        .report-label { color: var(--text-secondary); }
+        .report-value { color: var(--text-primary); font-weight: bold; }
+        .report-value.green { color: var(--arcade-green); }
+        .report-value.blue { color: var(--arcade-blue); }
+        .report-value.yellow { color: var(--arcade-yellow); }
+        .report-value.red { color: var(--arcade-red); }
+        .report-value.cyan { color: var(--arcade-cyan); }
+
+        .report-insight {
+            margin-top: 12px; padding: 10px 12px;
+            background: rgba(0, 255, 221, 0.05);
+            border-left: 3px solid var(--arcade-cyan);
+            border-radius: 0 6px 6px 0;
+            font-size: 12px; line-height: 1.5; color: var(--text-secondary);
+        }
+
+        .controls-section {
+            display: grid; grid-template-columns: 200px 1fr;
+            gap: 16px; margin-bottom: 24px;
+        }
+        .control-panel {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .control-title {
+            font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--arcade-cyan);
+        }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 6px;
+            font-family: var(--font-mono); font-size: 13px; font-weight: bold;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+            transition: all 0.2s; width: 100%;
+        }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-danger { background: var(--arcade-red); color: white; }
+        .btn-danger:hover:not(:disabled) { background: #ff6688; }
+
+        .process-badge {
+            padding: 3px 10px; border-radius: 10px; font-size: 11px;
+            font-weight: bold; text-transform: uppercase; letter-spacing: 1px; text-align: center;
+        }
+        .pb-idle { background: var(--text-muted); color: var(--bg-primary); }
+        .pb-running { background: var(--arcade-green); color: var(--bg-primary); animation: pulse 2s infinite; }
+        .pb-stopping { background: var(--arcade-yellow); color: var(--bg-primary); animation: pulse 1s infinite; }
+        .pb-complete { background: var(--arcade-blue); color: var(--bg-primary); }
+        .pb-error { background: var(--arcade-red); color: white; }
+
+        .log-panel {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px; display: flex; flex-direction: column;
+        }
+        .log-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+        }
+        .log-title {
+            font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary);
+        }
+        .log-output {
+            background: var(--bg-primary); border: 1px solid var(--border);
+            border-radius: 6px; padding: 12px; font-size: 11px; line-height: 1.5;
+            max-height: 300px; overflow-y: auto; flex: 1;
+        }
+        .log-output .log-empty { color: var(--text-muted); font-style: italic; }
+        .log-output div { color: var(--text-secondary); }
+        .log-error { color: var(--arcade-red) !important; }
+        .log-warning { color: var(--arcade-yellow) !important; }
+        .log-success { color: var(--arcade-green) !important; }
+        .log-info { color: var(--arcade-blue) !important; }
+
+        .nav-link {
+            color: var(--text-muted); text-decoration: none; font-size: 12px; transition: color 0.2s;
+        }
+        .nav-link:hover { color: var(--arcade-cyan); }
+
+        @media (max-width: 900px) {
+            .charts-row { grid-template-columns: 1fr; }
+            .controls-section { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <span class="logo">TARS RL Training</span>
+            <span id="gameTag" class="game-tag">DEFENDER</span>
+            <span id="algoTag" class="algo-tag">PPO</span>
+            <span id="statusBadge" class="status-badge status-waiting">Waiting</span>
+        </div>
+        <div class="top-bar-right">
+            <span id="elapsed">00:00:00</span>
+            <div class="connection">
+                <div id="connDot" class="connection-dot"></div>
+                <span id="connLabel">Disconnected</span>
+            </div>
+            <a href="/game" class="nav-link">Game Dashboard</a>
+            <a href="/" class="nav-link">MDR Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- Metric Cards -->
+        <div class="cards">
+            <div class="card">
+                <div class="card-label">Timestep</div>
+                <div class="card-value cyan" id="cardTimestep">--</div>
+                <div class="card-sub" id="cardTimestepSub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">Mean Reward (100)</div>
+                <div class="card-value" id="cardMeanReward">--</div>
+                <div class="card-sub" id="cardMeanRewardSub">rolling avg</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Best Reward</div>
+                <div class="card-value yellow" id="cardBestReward">--</div>
+                <div class="card-sub">single episode</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Episode Length</div>
+                <div class="card-value blue" id="cardEpLength">--</div>
+                <div class="card-sub">avg steps</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Episodes</div>
+                <div class="card-value purple" id="cardEpisodes">--</div>
+                <div class="card-sub">completed</div>
+            </div>
+            <div class="card">
+                <div class="card-label">FPS</div>
+                <div class="card-value yellow" id="cardFPS">--</div>
+                <div class="card-sub">frames/sec</div>
+            </div>
+            <div class="card">
+                <div class="card-label">GPU Memory</div>
+                <div class="card-value purple" id="cardGpuMem">--</div>
+                <div class="card-sub" id="cardGpuMemSub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">ETA</div>
+                <div class="card-value cyan" id="cardETA">--</div>
+                <div class="card-sub" id="cardETASub"></div>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-section">
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-label">Timestep Progress</span>
+                    <span class="progress-value" id="stepText">-- / --</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill cyan" id="stepFill" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-label">Episodes Completed</span>
+                    <span class="progress-value" id="episodeText">0</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill green" id="episodeFill" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Training Report -->
+        <div class="report-panel" id="reportPanel" style="display:none;">
+            <div class="report-header">
+                <span class="report-title">Training Report</span>
+                <span id="reportVerdict" class="report-verdict verdict-waiting">Analyzing...</span>
+            </div>
+            <div class="report-grid">
+                <div class="report-section">
+                    <div class="report-section-title">Reward</div>
+                    <div class="report-row">
+                        <span class="report-label">Mean Reward (100)</span>
+                        <span class="report-value green" id="rptMeanReward">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Best Mean Reward</span>
+                        <span class="report-value cyan" id="rptBestMean">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Best Episode</span>
+                        <span class="report-value yellow" id="rptBestEpisode">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Reward Trend</span>
+                        <span class="report-value" id="rptTrend">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Reward Plateau</span>
+                        <span class="report-value" id="rptPlateau">--</span>
+                    </div>
+                </div>
+                <div class="report-section">
+                    <div class="report-section-title">Policy</div>
+                    <div class="report-row">
+                        <span class="report-label">Policy Loss</span>
+                        <span class="report-value" id="rptPolicyLoss">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Value Loss</span>
+                        <span class="report-value" id="rptValueLoss">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Entropy</span>
+                        <span class="report-value" id="rptEntropy">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">KL Divergence</span>
+                        <span class="report-value" id="rptKL">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Clip Fraction</span>
+                        <span class="report-value" id="rptClip">--</span>
+                    </div>
+                </div>
+                <div class="report-section">
+                    <div class="report-section-title">Resources</div>
+                    <div class="report-row">
+                        <span class="report-label">GPU Memory</span>
+                        <span class="report-value" id="rptGpuMem">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">GPU Temp</span>
+                        <span class="report-value" id="rptGpuTemp">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">CPU Temp</span>
+                        <span class="report-value" id="rptCpuTemp">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">FPS</span>
+                        <span class="report-value yellow" id="rptFPS">--</span>
+                    </div>
+                    <div class="report-row">
+                        <span class="report-label">Elapsed</span>
+                        <span class="report-value" id="rptElapsed">--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="report-insight" id="reportInsight">
+                Waiting for training data to generate report...
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts">
+            <div class="chart-card full-width">
+                <div class="chart-title">Episode Reward</div>
+                <div class="chart-container large">
+                    <canvas id="rewardChart"></canvas>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-title">Value Loss / Policy Loss</div>
+                    <div class="chart-container">
+                        <canvas id="lossChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Episode Length</div>
+                    <div class="chart-container">
+                        <canvas id="lengthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-title">Entropy (Exploration)</div>
+                    <div class="chart-container">
+                        <canvas id="entropyChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">GPU Memory (GB)</div>
+                    <div class="chart-container">
+                        <canvas id="gpuChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls + Log -->
+        <div class="controls-section">
+            <div class="control-panel">
+                <span class="control-title">Training Control</span>
+                <span id="processBadge" class="process-badge pb-idle">Idle</span>
+                <button class="btn btn-danger" id="btnStop" onclick="stopTraining()" disabled>
+                    Stop Training
+                </button>
+                <div style="font-size:10px; color:var(--text-muted); line-height:1.4;">
+                    Sends SIGINT for cooperative shutdown. Agent saves checkpoint before exit.
+                </div>
+            </div>
+            <div class="log-panel">
+                <div class="log-header">
+                    <span class="log-title">Training Log</span>
+                </div>
+                <div class="log-output" id="trainLog">
+                    <span class="log-empty">Waiting for RL metrics stream...</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ============================================================
+        // Chart Setup
+        // ============================================================
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 0 },
+            plugins: { legend: { display: false } },
+            scales: {
+                x: {
+                    grid: { color: '#1e1e2e' },
+                    ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } },
+                },
+                y: {
+                    grid: { color: '#1e1e2e' },
+                    ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } },
+                },
+            },
+        };
+
+        function makeChart(id, color, yLabel, showEMA) {
+            const ctx = document.getElementById(id).getContext('2d');
+            const datasets = [{
+                data: [], borderColor: showEMA ? color + '4D' : color,
+                backgroundColor: showEMA ? color + '1A' : color + '20',
+                borderWidth: showEMA ? 1 : 1.5, pointRadius: 0, fill: true, tension: 0.3,
+            }];
+            if (showEMA) {
+                datasets.push({
+                    data: [], borderColor: color, backgroundColor: 'transparent',
+                    borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3,
+                });
+            }
+            return new Chart(ctx, {
+                type: 'line', data: { labels: [], datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#1e1e2e' }, ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } } },
+                        y: { grid: { color: '#1e1e2e' }, ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } },
+                            title: { display: true, text: yLabel, color: '#555577', font: { size: 10 } } },
+                    },
+                },
+            });
+        }
+
+        function makeDualChart(id, color1, label1, color2, label2) {
+            const ctx = document.getElementById(id).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: label1, data: [], borderColor: color1, backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' },
+                        { label: label2, data: [], borderColor: color2, backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y1' },
+                    ],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+                    plugins: {
+                        legend: { display: true, labels: { color: '#8888aa', font: { family: "'JetBrains Mono', monospace", size: 10 } } },
+                    },
+                    scales: {
+                        x: { grid: { color: '#1e1e2e' }, ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } } },
+                        y: { position: 'left', grid: { color: '#1e1e2e' }, ticks: { color: '#555577', font: { size: 10 } },
+                            title: { display: true, text: label1, color: color1, font: { size: 10 } } },
+                        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#555577', font: { size: 10 } },
+                            title: { display: true, text: label2, color: color2, font: { size: 10 } } },
+                    },
+                },
+            });
+        }
+
+        const rewardChart = makeChart('rewardChart', '#00ff88', 'Reward', true);
+        const lossChart = makeDualChart('lossChart', '#ff4466', 'Value Loss', '#00aaff', 'Policy Loss');
+        const lengthChart = makeChart('lengthChart', '#00aaff', 'Steps', false);
+        const entropyChart = makeChart('entropyChart', '#aa66ff', 'Entropy', false);
+        const gpuChart = makeChart('gpuChart', '#aa66ff', 'GB', false);
+
+        const EMA_ALPHA = 0.05;
+        const emaState = new Map();
+
+        function pushPoint(chart, step, value, maxPoints) {
+            if (value == null) return;
+            maxPoints = maxPoints || 500;
+            chart.data.labels.push(step);
+            chart.data.datasets[0].data.push(value);
+            if (chart.data.datasets.length > 1 && chart !== lossChart) {
+                const prev = emaState.get(chart);
+                const ema = prev == null ? value : EMA_ALPHA * value + (1 - EMA_ALPHA) * prev;
+                emaState.set(chart, ema);
+                chart.data.datasets[1].data.push(ema);
+            }
+            if (chart.data.labels.length > maxPoints) {
+                const skip = Math.floor(chart.data.labels.length / maxPoints);
+                chart.data.labels = chart.data.labels.filter(function(_, i) { return i % skip === 0; });
+                for (var d = 0; d < chart.data.datasets.length; d++) {
+                    chart.data.datasets[d].data = chart.data.datasets[d].data.filter(function(_, i) { return i % skip === 0; });
+                }
+            }
+            chart.update('none');
+        }
+
+        function pushDualPoint(chart, step, v1, v2, maxPoints) {
+            if (v1 == null && v2 == null) return;
+            maxPoints = maxPoints || 500;
+            chart.data.labels.push(step);
+            chart.data.datasets[0].data.push(v1);
+            chart.data.datasets[1].data.push(v2);
+            if (chart.data.labels.length > maxPoints) {
+                var skip = Math.floor(chart.data.labels.length / maxPoints);
+                chart.data.labels = chart.data.labels.filter(function(_, i) { return i % skip === 0; });
+                for (var d = 0; d < chart.data.datasets.length; d++) {
+                    chart.data.datasets[d].data = chart.data.datasets[d].data.filter(function(_, i) { return i % skip === 0; });
+                }
+            }
+            chart.update('none');
+        }
+
+        // ============================================================
+        // State
+        // ============================================================
+        var startTime = null;
+        var elapsedInterval = null;
+        var logCount = 0;
+        var LOG_EVERY_N = 5;
+
+        var reportState = {
+            rewardHistory: [],
+            bestMeanReward: -Infinity,
+            bestEpisodeReward: -Infinity,
+            lastImprovementTimestep: 0,
+        };
+
+        // ============================================================
+        // Helpers
+        // ============================================================
+        function fmtTime(seconds) {
+            var h = Math.floor(seconds / 3600);
+            var m = Math.floor((seconds % 3600) / 60);
+            var s = Math.floor(seconds % 60);
+            return [h, m, s].map(function(v) { return String(v).padStart(2, '0'); }).join(':');
+        }
+
+        function fmtNumber(n) {
+            if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+            return String(n);
+        }
+
+        function startElapsedTimer() {
+            if (elapsedInterval) return;
+            elapsedInterval = setInterval(function() {
+                if (startTime) {
+                    document.getElementById('elapsed').textContent = fmtTime((Date.now() / 1000) - startTime);
+                }
+            }, 1000);
+        }
+
+        function setStatus(status) {
+            var badge = document.getElementById('statusBadge');
+            badge.className = 'status-badge status-' + status;
+            badge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+
+        function setConnection(connected) {
+            document.getElementById('connDot').className = 'connection-dot' + (connected ? ' connected' : '');
+            document.getElementById('connLabel').textContent = connected ? 'Connected' : 'Disconnected';
+        }
+
+        function tempColor(c) {
+            if (c == null) return '';
+            if (c < 60) return 'temp-green';
+            if (c < 75) return 'temp-yellow';
+            return 'temp-red';
+        }
+
+        function appendLog(text) {
+            var log = document.getElementById('trainLog');
+            var empty = log.querySelector('.log-empty');
+            if (empty) empty.remove();
+            var line = document.createElement('div');
+            var lower = text.toLowerCase();
+            if (lower.indexOf('error') !== -1 || lower.indexOf('failed') !== -1) line.className = 'log-error';
+            else if (lower.indexOf('warning') !== -1) line.className = 'log-warning';
+            else if (lower.indexOf('complete') !== -1 || lower.indexOf('saved') !== -1 || lower.indexOf('best') !== -1) line.className = 'log-success';
+            else if (lower.indexOf('info') !== -1) line.className = 'log-info';
+            line.textContent = text;
+            log.appendChild(line);
+            log.scrollTop = log.scrollHeight;
+            while (log.children.length > 500) log.removeChild(log.firstChild);
+        }
+
+        // ============================================================
+        // Process Events
+        // ============================================================
+        function processEvent(data) {
+            var event = data.event;
+
+            if (event === 'rl_train_begin') {
+                startTime = data.timestamp;
+                setStatus('training');
+                startElapsedTimer();
+                document.getElementById('processBadge').className = 'process-badge pb-running';
+                document.getElementById('processBadge').textContent = 'Running';
+                document.getElementById('btnStop').disabled = false;
+                if (data.game_name) document.getElementById('gameTag').textContent = data.game_name.toUpperCase();
+                appendLog('[INFO] RL training started — ' + (data.algorithm || 'PPO') + ' on ' + (data.env_id || 'Defender'));
+                return;
+            }
+
+            if (event === 'rl_train_end') {
+                setStatus('complete');
+                if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
+                document.getElementById('processBadge').className = 'process-badge pb-complete';
+                document.getElementById('processBadge').textContent = 'Complete';
+                document.getElementById('btnStop').disabled = true;
+                appendLog('[INFO] Training complete — ' + (data.total_timesteps || '?') + ' timesteps, best mean reward: ' + (data.best_mean_reward || '?'));
+                return;
+            }
+
+            if (event !== 'rl_metrics') return;
+
+            // Auto-detect training state
+            if (document.getElementById('statusBadge').textContent === 'Waiting') {
+                setStatus('training');
+                startTime = data.timestamp - (data.elapsed_seconds || 0);
+                startElapsedTimer();
+                document.getElementById('processBadge').className = 'process-badge pb-running';
+                document.getElementById('processBadge').textContent = 'Running';
+                document.getElementById('btnStop').disabled = false;
+            }
+
+            var ts = data.timestep || 0;
+            var totalTs = data.total_timesteps || 1;
+
+            // Cards
+            document.getElementById('cardTimestep').textContent = fmtNumber(ts);
+            document.getElementById('cardTimestepSub').textContent = 'of ' + fmtNumber(totalTs);
+
+            if (data.mean_reward != null) {
+                var el = document.getElementById('cardMeanReward');
+                el.textContent = data.mean_reward.toFixed(1);
+                el.className = 'card-value ' + (data.mean_reward > 0 ? '' : 'red');
+            }
+
+            if (data.best_reward != null) {
+                document.getElementById('cardBestReward').textContent = data.best_reward.toFixed(0);
+            }
+            if (data.mean_episode_length != null) {
+                document.getElementById('cardEpLength').textContent = data.mean_episode_length.toFixed(0);
+            }
+            if (data.episodes_completed != null) {
+                document.getElementById('cardEpisodes').textContent = data.episodes_completed.toLocaleString();
+            }
+            if (data.fps != null) {
+                document.getElementById('cardFPS').textContent = data.fps.toFixed(0);
+            }
+            if (data.gpu_memory_allocated_gb != null) {
+                document.getElementById('cardGpuMem').textContent = data.gpu_memory_allocated_gb.toFixed(1);
+                if (data.gpu_memory_total_gb) {
+                    document.getElementById('cardGpuMemSub').textContent = 'of ' + data.gpu_memory_total_gb.toFixed(1) + ' GB';
+                }
+            }
+            if (data.eta_seconds != null && data.eta_seconds > 0) {
+                document.getElementById('cardETA').textContent = fmtTime(data.eta_seconds);
+            }
+
+            // Progress bars
+            var stepPct = Math.min(100, (ts / totalTs) * 100);
+            document.getElementById('stepFill').style.width = stepPct + '%';
+            document.getElementById('stepText').textContent = fmtNumber(ts) + ' / ' + fmtNumber(totalTs);
+            if (data.episodes_completed != null) {
+                document.getElementById('episodeText').textContent = data.episodes_completed.toLocaleString();
+                document.getElementById('episodeFill').style.width = stepPct + '%';
+            }
+
+            // Charts
+            var tsLabel = fmtNumber(ts);
+            if (data.mean_reward != null) pushPoint(rewardChart, tsLabel, data.mean_reward);
+            if (data.value_loss != null || data.policy_loss != null) {
+                pushDualPoint(lossChart, tsLabel, data.value_loss, data.policy_loss);
+            }
+            if (data.mean_episode_length != null) pushPoint(lengthChart, tsLabel, data.mean_episode_length);
+            if (data.entropy != null) pushPoint(entropyChart, tsLabel, Math.abs(data.entropy));
+            if (data.gpu_memory_allocated_gb != null) pushPoint(gpuChart, tsLabel, data.gpu_memory_allocated_gb);
+
+            // Report
+            updateReport(data);
+
+            // Periodic log
+            logCount++;
+            if (logCount % LOG_EVERY_N === 0) {
+                var parts = ['[' + fmtNumber(ts) + '/' + fmtNumber(totalTs) + ']'];
+                if (data.mean_reward != null) parts.push('reward=' + data.mean_reward.toFixed(1));
+                if (data.episodes_completed != null) parts.push('ep=' + data.episodes_completed);
+                if (data.fps != null) parts.push(data.fps.toFixed(0) + ' fps');
+                if (data.gpu_memory_allocated_gb != null) parts.push('gpu=' + data.gpu_memory_allocated_gb.toFixed(1) + 'GB');
+                if (data.eta_seconds != null && data.eta_seconds > 0) parts.push('eta=' + fmtTime(data.eta_seconds));
+                appendLog(parts.join('  '));
+            }
+        }
+
+        // ============================================================
+        // Training Report
+        // ============================================================
+        function updateReport(data) {
+            var panel = document.getElementById('reportPanel');
+            panel.style.display = '';
+
+            var meanReward = data.mean_reward;
+            var ts = data.timestep || 0;
+
+            if (meanReward == null) return;
+
+            reportState.rewardHistory.push({ ts: ts, reward: meanReward });
+            if (reportState.rewardHistory.length > 500) reportState.rewardHistory.shift();
+
+            if (meanReward > reportState.bestMeanReward) {
+                reportState.bestMeanReward = meanReward;
+                reportState.lastImprovementTimestep = ts;
+            }
+            if (data.best_reward != null && data.best_reward > reportState.bestEpisodeReward) {
+                reportState.bestEpisodeReward = data.best_reward;
+            }
+
+            document.getElementById('rptMeanReward').textContent = meanReward.toFixed(1);
+            document.getElementById('rptBestMean').textContent = reportState.bestMeanReward.toFixed(1);
+            document.getElementById('rptBestEpisode').textContent = reportState.bestEpisodeReward.toFixed(0);
+
+            // Trend
+            var hist = reportState.rewardHistory;
+            var trendText = 'Collecting...';
+            var trendClass = '';
+            if (hist.length >= 20) {
+                var recent = hist.slice(-10).map(function(h) { return h.reward; });
+                var older = hist.slice(-20, -10).map(function(h) { return h.reward; });
+                var recentAvg = recent.reduce(function(a, b) { return a + b; }, 0) / recent.length;
+                var olderAvg = older.reduce(function(a, b) { return a + b; }, 0) / older.length;
+                var diff = recentAvg - olderAvg;
+                var pctChange = olderAvg !== 0 ? (diff / Math.abs(olderAvg)) : 0;
+                if (pctChange > 0.10) { trendText = 'Improving fast'; trendClass = 'green'; }
+                else if (pctChange > 0.02) { trendText = 'Improving'; trendClass = 'green'; }
+                else if (pctChange > -0.02) { trendText = 'Plateaued'; trendClass = 'yellow'; }
+                else { trendText = 'Declining'; trendClass = 'red'; }
+            }
+            var trendEl = document.getElementById('rptTrend');
+            trendEl.textContent = trendText;
+            trendEl.className = 'report-value' + (trendClass ? ' ' + trendClass : '');
+
+            // Plateau
+            var plateau = ts - reportState.lastImprovementTimestep;
+            var plateauEl = document.getElementById('rptPlateau');
+            plateauEl.textContent = fmtNumber(plateau) + ' timesteps';
+            if (plateau > 200000) plateauEl.className = 'report-value red';
+            else if (plateau > 100000) plateauEl.className = 'report-value yellow';
+            else plateauEl.className = 'report-value green';
+
+            // Policy
+            if (data.policy_loss != null) document.getElementById('rptPolicyLoss').textContent = data.policy_loss.toFixed(4);
+            if (data.value_loss != null) document.getElementById('rptValueLoss').textContent = data.value_loss.toFixed(4);
+            if (data.entropy != null) {
+                var entEl = document.getElementById('rptEntropy');
+                entEl.textContent = Math.abs(data.entropy).toFixed(4);
+                if (Math.abs(data.entropy) < 0.01) entEl.className = 'report-value red';
+                else if (Math.abs(data.entropy) < 0.1) entEl.className = 'report-value yellow';
+                else entEl.className = 'report-value green';
+            }
+            if (data.approx_kl != null) {
+                var klEl = document.getElementById('rptKL');
+                klEl.textContent = data.approx_kl.toFixed(4);
+                if (data.approx_kl > 0.05) klEl.className = 'report-value red';
+                else if (data.approx_kl > 0.02) klEl.className = 'report-value yellow';
+                else klEl.className = 'report-value green';
+            }
+            if (data.clip_fraction != null) {
+                var clipEl = document.getElementById('rptClip');
+                clipEl.textContent = (data.clip_fraction * 100).toFixed(1) + '%';
+                if (data.clip_fraction > 0.3) clipEl.className = 'report-value red';
+                else if (data.clip_fraction > 0.15) clipEl.className = 'report-value yellow';
+                else clipEl.className = 'report-value green';
+            }
+
+            // Resources
+            if (data.gpu_memory_allocated_gb && data.gpu_memory_total_gb) {
+                var pct = (data.gpu_memory_allocated_gb / data.gpu_memory_total_gb * 100).toFixed(0);
+                var memEl = document.getElementById('rptGpuMem');
+                memEl.textContent = data.gpu_memory_allocated_gb.toFixed(1) + ' / ' + data.gpu_memory_total_gb.toFixed(1) + ' GB (' + pct + '%)';
+                if (pct < 70) memEl.className = 'report-value green';
+                else if (pct < 85) memEl.className = 'report-value blue';
+                else memEl.className = 'report-value yellow';
+            }
+            if (data.gpu_temp_c != null) {
+                var gtEl = document.getElementById('rptGpuTemp');
+                gtEl.textContent = Math.round(data.gpu_temp_c) + ' C';
+                gtEl.className = 'report-value ' + tempColor(data.gpu_temp_c).replace('temp-', '');
+            }
+            if (data.cpu_temp_c != null) {
+                var ctEl = document.getElementById('rptCpuTemp');
+                ctEl.textContent = Math.round(data.cpu_temp_c) + ' C';
+                ctEl.className = 'report-value ' + tempColor(data.cpu_temp_c).replace('temp-', '');
+            }
+            if (data.fps != null) document.getElementById('rptFPS').textContent = data.fps.toFixed(0) + ' fps';
+            if (data.elapsed_seconds) document.getElementById('rptElapsed').textContent = fmtTime(data.elapsed_seconds);
+
+            generateVerdict(data, trendText, plateau);
+        }
+
+        function generateVerdict(data, trendText, plateau) {
+            var verdict, verdictClass;
+            var insightParts = [];
+
+            if (trendText === 'Plateaued' && plateau > 200000) {
+                verdict = 'Plateaued';
+                verdictClass = 'verdict-normal';
+                insightParts.push('Reward has plateaued. No improvement for ' + fmtNumber(plateau) + ' timesteps. Consider adjusting entropy coefficient or learning rate.');
+            } else if (trendText === 'Declining') {
+                verdict = 'Needs Attention';
+                verdictClass = 'verdict-bad';
+                insightParts.push('Mean reward is declining. Check if learning rate is too high or entropy coefficient is too low.');
+            } else if (trendText === 'Improving fast') {
+                verdict = 'Improving';
+                verdictClass = 'verdict-excellent';
+                insightParts.push('Agent is learning rapidly. Mean reward is increasing at a strong pace. Continue training.');
+            } else if (trendText === 'Improving') {
+                verdict = 'Improving';
+                verdictClass = 'verdict-good';
+                insightParts.push('Agent is making progress. Reward is gradually increasing. Training is healthy.');
+            } else if (reportState.rewardHistory.length < 20) {
+                verdict = 'Early Stage';
+                verdictClass = 'verdict-normal';
+                insightParts.push('Collecting data. Need more episodes to assess training health. RL agents typically need 100K+ timesteps before showing consistent improvement.');
+            } else {
+                verdict = 'Stable';
+                verdictClass = 'verdict-good';
+                insightParts.push('Training is stable. Reward is holding steady.');
+            }
+
+            if (data.entropy != null && Math.abs(data.entropy) < 0.01) {
+                insightParts.push('Entropy is very low — the policy may have collapsed to deterministic actions. Consider increasing ent_coef.');
+            }
+            if (data.approx_kl != null && data.approx_kl > 0.05) {
+                insightParts.push('KL divergence is high — policy updates are too aggressive. Consider reducing learning rate.');
+            }
+
+            document.getElementById('reportVerdict').textContent = verdict;
+            document.getElementById('reportVerdict').className = 'report-verdict ' + verdictClass;
+            document.getElementById('reportInsight').textContent = insightParts.join(' | ');
+        }
+
+        // ============================================================
+        // Training Control
+        // ============================================================
+        function stopTraining() {
+            document.getElementById('processBadge').className = 'process-badge pb-stopping';
+            document.getElementById('processBadge').textContent = 'Stopping';
+            document.getElementById('btnStop').disabled = true;
+            fetch('/train/stop', { method: 'POST' })
+                .then(function() { appendLog('[INFO] Stop signal sent — saving checkpoint...'); })
+                .catch(function(err) { appendLog('[ERROR] Stop failed: ' + err.message); });
+        }
+
+        // ============================================================
+        // SSE Connection
+        // ============================================================
+        function connect() {
+            var source = new EventSource('/metrics');
+
+            source.onopen = function() {
+                setConnection(true);
+            };
+
+            source.onmessage = function(e) {
+                try {
+                    var data = JSON.parse(e.data);
+                    if (data.event && data.event.indexOf('rl_') === 0) {
+                        processEvent(data);
+                    }
+                } catch (err) {
+                    // ignore parse errors
+                }
+            };
+
+            source.onerror = function() {
+                setConnection(false);
+                source.close();
+                setTimeout(connect, 3000);
+            };
+        }
+
+        // ============================================================
+        // Initialize
+        // ============================================================
+        function init() {
+            fetch('/state')
+                .then(function(res) { return res.json(); })
+                .then(function(state) {
+                    if (state.latest && state.latest.event && state.latest.event.indexOf('rl_') === 0) {
+                        if (state.status === 'training') {
+                            setStatus('training');
+                            startElapsedTimer();
+                        }
+                    }
+                })
+                .catch(function() {});
+            connect();
+        }
+
+        init();
+    </script>
+</body>
+</html>

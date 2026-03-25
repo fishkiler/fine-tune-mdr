@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fine-Tune MDR — Benchmark Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a25;
+            --border: #1e1e2e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #8888aa;
+            --text-muted: #555577;
+            --cyber-green: #00ff88;
+            --cyber-green-dim: #00cc6a;
+            --cyber-blue: #00aaff;
+            --cyber-red: #ff4466;
+            --cyber-yellow: #ffaa00;
+            --cyber-purple: #aa66ff;
+            --cyber-orange: #ff8844;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ── Top Bar ─────────────────────────────────────── */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        .top-bar-left { display: flex; align-items: center; gap: 16px; }
+        .logo { font-size: 18px; font-weight: bold; color: var(--cyber-yellow); }
+        .logo a { color: var(--cyber-green); text-decoration: none; font-size: 12px; }
+        .logo a:hover { text-decoration: underline; }
+
+        .status-badge {
+            padding: 4px 12px; border-radius: 12px; font-size: 12px;
+            font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .status-idle { background: var(--text-muted); color: var(--bg-primary); }
+        .status-running { background: var(--cyber-yellow); color: var(--bg-primary); animation: pulse 2s infinite; }
+        .status-complete { background: var(--cyber-green); color: var(--bg-primary); }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        .top-bar-right {
+            display: flex; align-items: center; gap: 24px;
+            color: var(--text-secondary); font-size: 13px;
+        }
+        .connection { display: flex; align-items: center; gap: 6px; }
+        .connection-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyber-red); }
+        .connection-dot.connected { background: var(--cyber-green); }
+
+        /* ── Layout ──────────────────────────────────────── */
+        .container { max-width: 1500px; margin: 0 auto; padding: 24px; }
+
+        /* ── Progress Panel ──────────────────────────────── */
+        .progress-panel {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 20px;
+        }
+        .progress-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+        .progress-trial { font-size: 16px; font-weight: bold; color: var(--cyber-yellow); min-width: 200px; }
+        .progress-bar-wrap { flex: 1; }
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; background: var(--cyber-yellow); }
+        .progress-text { font-size: 12px; color: var(--text-secondary); text-align: right; min-width: 120px; }
+
+        /* ── Metric Cards ────────────────────────────────── */
+        .cards {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px; margin-bottom: 24px;
+        }
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 14px; transition: border-color 0.2s;
+        }
+        .card:hover { border-color: var(--cyber-green-dim); }
+        .card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 6px; }
+        .card-value { font-size: 24px; font-weight: bold; color: var(--cyber-green); }
+        .card-value.blue { color: var(--cyber-blue); }
+        .card-value.yellow { color: var(--cyber-yellow); }
+        .card-value.purple { color: var(--cyber-purple); }
+        .card-value.red { color: var(--cyber-red); }
+        .card-value.orange { color: var(--cyber-orange); }
+        .card-sub { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+
+        /* ── Charts ──────────────────────────────────────── */
+        .charts {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 16px; margin-bottom: 24px;
+        }
+        .chart-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px;
+        }
+        .chart-card.full { grid-column: 1 / -1; }
+        .chart-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 12px; }
+        .chart-container { position: relative; height: 250px; }
+        .chart-container.tall { height: 350px; }
+
+        /* ── Results Table ────────────────────────────────── */
+        .table-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 20px; margin-bottom: 24px;
+        }
+        .table-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--cyber-blue); margin-bottom: 16px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th {
+            text-align: left; padding: 8px 12px; border-bottom: 2px solid var(--border);
+            font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+        td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+        tr:hover td { background: var(--bg-card-hover); }
+        tr.best td { color: var(--cyber-green); font-weight: bold; }
+        tr.oom td { color: var(--cyber-red); opacity: 0.7; }
+        td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+        .badge-ok { color: var(--cyber-green); }
+        .badge-oom { color: var(--cyber-red); font-weight: bold; }
+        .badge-skip { color: var(--cyber-yellow); font-weight: bold; }
+        .badge-best { background: var(--cyber-green); color: var(--bg-primary); padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: bold; }
+        .badge-running { background: var(--cyber-yellow); color: var(--bg-primary); padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: bold; animation: pulse 2s infinite; }
+        tr.skip td { color: var(--cyber-yellow); opacity: 0.7; }
+
+        /* ── Tooltips ───────────────────────────────────── */
+        [title] { cursor: help; }
+
+        /* ── Responsive ──────────────────────────────────── */
+        @media (max-width: 900px) { .charts { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <span class="logo">&gt;_ Benchmark <a href="/">training dashboard</a></span>
+            <span id="statusBadge" class="status-badge status-idle" title="Benchmark status: idle (waiting), running (trials in progress), or complete">Idle</span>
+        </div>
+        <div class="top-bar-right">
+            <span id="trialProgress" title="Number of completed trials out of total scheduled">0 / 0 trials</span>
+            <div class="connection" title="SSE connection to the dashboard server for live metric streaming">
+                <div id="connDot" class="connection-dot"></div>
+                <span id="connLabel">Disconnected</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- Progress Panel -->
+        <div class="progress-panel">
+            <div>
+                <div class="progress-label">Current Trial</div>
+                <div class="progress-trial" id="currentTrial" title="Name of the currently executing benchmark trial configuration">Waiting...</div>
+            </div>
+            <div class="progress-bar-wrap">
+                <div class="progress-bar" title="Step completion progress within the current trial">
+                    <div class="progress-fill" id="trialFill" style="width:0%"></div>
+                </div>
+            </div>
+            <div class="progress-text" id="stepProgress" title="Current step number out of total steps per trial (first 2 are warmup)">0 / 0 steps</div>
+        </div>
+
+        <!-- Live Metric Cards -->
+        <div class="cards">
+            <div class="card" title="Training throughput for the current step. Higher is better. Calculated as batch_size × seq_length / step_time.">
+                <div class="card-label">Tokens/sec</div>
+                <div class="card-value" id="cardTps">--</div>
+                <div class="card-sub">current step</div>
+            </div>
+            <div class="card" title="Cross-entropy loss on the training batch. Should decrease over time. Used here to verify the model is learning, not for comparison between trials.">
+                <div class="card-label">Loss</div>
+                <div class="card-value blue" id="cardLoss">--</div>
+                <div class="card-sub">training loss</div>
+            </div>
+            <div class="card" title="Wall-clock time for one forward + backward pass. Lower is better. Includes gradient computation and optimizer step.">
+                <div class="card-label">Step Time</div>
+                <div class="card-value yellow" id="cardStepTime">--</div>
+                <div class="card-sub">seconds</div>
+            </div>
+            <div class="card" title="CPU utilization of the benchmark process. High CPU can indicate data loading bottlenecks or excessive preprocessing.">
+                <div class="card-label">CPU</div>
+                <div class="card-value orange" id="cardCpu">--</div>
+                <div class="card-sub">process %</div>
+            </div>
+            <div class="card" title="Physical memory used by the Python process. On DGX Spark unified memory, RAM and GPU memory share the same 128 GB pool.">
+                <div class="card-label">RAM (Process)</div>
+                <div class="card-value purple" id="cardRam">--</div>
+                <div class="card-sub" id="cardRamSub">GB</div>
+            </div>
+            <div class="card" title="GPU memory currently allocated by PyTorch tensors. On unified memory, this is a subset of total system RAM, not a separate pool.">
+                <div class="card-label">GPU Memory</div>
+                <div class="card-value" id="cardGpu">--</div>
+                <div class="card-sub" id="cardGpuSub">allocated GB</div>
+            </div>
+            <div class="card" title="Highest GPU memory allocation seen during this trial. Determines whether a configuration will fit in memory for full training runs.">
+                <div class="card-label">GPU Peak</div>
+                <div class="card-value red" id="cardGpuPeak">--</div>
+                <div class="card-sub">peak GB</div>
+            </div>
+            <div class="card" title="L2 norm of gradients before clipping. Spikes indicate training instability. Consistently high values suggest the learning rate is too high.">
+                <div class="card-label">Grad Norm</div>
+                <div class="card-value yellow" id="cardGrad">--</div>
+                <div class="card-sub">stability</div>
+            </div>
+        </div>
+
+        <!-- Live Charts -->
+        <div class="charts">
+            <div class="chart-card">
+                <div class="chart-title" title="Per-step throughput for the current trial. First 2 steps are warmup (slower due to CUDA kernel compilation). Steady-state throughput is measured from step 3 onward.">Tokens/sec (current trial)</div>
+                <div class="chart-container"><canvas id="tpsChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title" title="Loss curve for the current trial. Not meaningful for cross-trial comparison since each trial processes different packed batches.">Training Loss (current trial)</div>
+                <div class="chart-container"><canvas id="lossChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title" title="System resource utilization during the current trial. Dual-axis: left shows CPU percentage, right shows process RAM in GB.">CPU % &amp; RAM GB (current trial)</div>
+                <div class="chart-container"><canvas id="cpuRamChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title" title="GPU memory tracking during the current trial. Dual-axis: green line is current allocation, red line is peak allocation seen so far.">GPU Memory GB (current trial)</div>
+                <div class="chart-container"><canvas id="gpuChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Comparison Bar Chart -->
+        <div class="charts">
+            <div class="chart-card full">
+                <div class="chart-title" title="Side-by-side throughput comparison across all completed trials. Green = best, blue = normal, red = OOM, yellow = skipped. The winning configuration should be used in config.yaml.">Throughput Comparison (tokens/sec — higher is better)</div>
+                <div class="chart-container tall"><canvas id="compChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="table-card">
+            <div class="table-title">Trial Results</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th title="Configuration name encoding batch size, sequence length, and gradient checkpointing (gc_ prefix)">Trial</th>
+                        <th title="Per-device training batch size. Larger batches increase tokens per step but use more memory.">Batch</th>
+                        <th title="Maximum sequence length in tokens. Longer sequences capture more context but increase memory quadratically with attention.">SeqLen</th>
+                        <th title="Gradient Checkpointing. Y = enabled, saves memory by recomputing activations during backward pass at the cost of ~20-30% slower steps.">GC</th>
+                        <th class="num" title="Total tokens processed per optimizer step: batch_size × grad_accum × seq_length. Higher means more data per update.">Tok/Step</th>
+                        <th class="num" title="Steady-state throughput in tokens per second (excluding warmup). The primary metric for comparing configurations.">Tok/s</th>
+                        <th class="num" title="Average seconds per training step (excluding warmup). Inverse of throughput normalized by tokens per step.">s/step</th>
+                        <th class="num" title="Peak GPU memory allocated during the trial in GB. Must fit within available system memory to avoid OOM.">Peak Mem</th>
+                        <th title="Trial outcome: OK = completed successfully, OOM = ran out of memory, SKIP = skipped due to low available RAM, BEST = highest throughput.">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody">
+                    <tr><td colspan="9" style="color:var(--text-muted);text-align:center;padding:20px;">Waiting for benchmark to start...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+    // ================================================================
+    // Chart Setup
+    // ================================================================
+    const chartColors = {
+        green: '#00ff88', blue: '#00aaff', yellow: '#ffaa00',
+        purple: '#aa66ff', red: '#ff4466', orange: '#ff8844',
+    };
+
+    const baseOpts = {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: '#1e1e2e' }, ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } } },
+            y: { grid: { color: '#1e1e2e' }, ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } } },
+        },
+    };
+
+    function makeLineChart(id, color, yLabel) {
+        return new Chart(document.getElementById(id).getContext('2d'), {
+            type: 'line',
+            data: { labels: [], datasets: [{ data: [], borderColor: color, backgroundColor: color + '20', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3 }] },
+            options: { ...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, title: { display: true, text: yLabel, color: '#555577', font: { size: 10 } } } } },
+        });
+    }
+
+    function makeDualChart(id, label1, color1, label2, color2, yLabel) {
+        return new Chart(document.getElementById(id).getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: label1, data: [], borderColor: color1, backgroundColor: color1 + '20', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3, yAxisID: 'y' },
+                    { label: label2, data: [], borderColor: color2, backgroundColor: color2 + '20', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3, yAxisID: 'y1' },
+                ],
+            },
+            options: {
+                ...baseOpts,
+                plugins: { legend: { display: true, labels: { color: '#8888aa', font: { family: "'JetBrains Mono', monospace", size: 10 } } } },
+                scales: {
+                    x: baseOpts.scales.x,
+                    y: { ...baseOpts.scales.y, title: { display: true, text: label1, color: color1, font: { size: 10 } }, position: 'left' },
+                    y1: { ...baseOpts.scales.y, title: { display: true, text: label2, color: color2, font: { size: 10 } }, position: 'right', grid: { drawOnChartArea: false } },
+                },
+            },
+        });
+    }
+
+    const tpsChart = makeLineChart('tpsChart', chartColors.green, 'Tok/s');
+    const lossChart = makeLineChart('lossChart', chartColors.blue, 'Loss');
+    const cpuRamChart = makeDualChart('cpuRamChart', 'CPU %', chartColors.orange, 'RAM GB', chartColors.purple, '');
+    const gpuChart = makeDualChart('gpuChart', 'Allocated', chartColors.green, 'Peak', chartColors.red, 'GB');
+
+    // Comparison bar chart
+    const compChart = new Chart(document.getElementById('compChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+        options: {
+            ...baseOpts,
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ...baseOpts.scales.x, title: { display: true, text: 'Tokens/sec', color: '#555577', font: { size: 10 } } },
+                y: { ...baseOpts.scales.y, ticks: { ...baseOpts.scales.y.ticks, font: { family: "'JetBrains Mono', monospace", size: 11 } } },
+            },
+        },
+    });
+
+    function pushPoint(chart, step, value, dsIdx = 0) {
+        if (value == null) return;
+        if (dsIdx === 0) chart.data.labels.push(step);
+        chart.data.datasets[dsIdx].data.push(value);
+        chart.update('none');
+    }
+
+    function clearChart(chart) {
+        chart.data.labels = [];
+        chart.data.datasets.forEach(ds => ds.data = []);
+        chart.update('none');
+    }
+
+    // ================================================================
+    // State
+    // ================================================================
+    let benchConfig = {};
+    let completedResults = [];
+    let currentTrialLabel = null;
+    let totalTrials = 0;
+
+    function setStatus(status) {
+        const b = document.getElementById('statusBadge');
+        b.className = 'status-badge status-' + status;
+        b.textContent = { idle: 'Idle', running: 'Running', complete: 'Complete' }[status] || status;
+    }
+
+    function setConnection(connected) {
+        document.getElementById('connDot').className = 'connection-dot' + (connected ? ' connected' : '');
+        document.getElementById('connLabel').textContent = connected ? 'Connected' : 'Disconnected';
+    }
+
+    function fmtNum(n, decimals = 0) {
+        if (n == null || n === 0) return '--';
+        return n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    // ================================================================
+    // Results Table
+    // ================================================================
+    function updateResultsTable() {
+        const body = document.getElementById('resultsBody');
+        if (completedResults.length === 0 && !currentTrialLabel) {
+            body.innerHTML = '<tr><td colspan="9" style="color:var(--text-muted);text-align:center;padding:20px;">Waiting for benchmark to start...</td></tr>';
+            return;
+        }
+
+        // Find best tokens/sec (exclude OOM and skipped)
+        let bestTps = 0;
+        completedResults.forEach(r => {
+            const isSkip = r.skipped || r.event === 'trial_skip';
+            if (!r.oom && !isSkip && r.tokens_per_sec > bestTps) bestTps = r.tokens_per_sec;
+        });
+
+        let html = '';
+        completedResults.forEach(r => {
+            const isSkip = r.skipped || r.event === 'trial_skip';
+            const isOom = r.oom && !isSkip;
+            const isOk = !isOom && !isSkip;
+            const isBest = isOk && r.tokens_per_sec === bestTps && bestTps > 0;
+            const cls = isSkip ? 'skip' : (isOom ? 'oom' : (isBest ? 'best' : ''));
+            const statusBadge = isSkip ? '<span class="badge-skip">SKIP</span>' :
+                (isOom ? '<span class="badge-oom">OOM</span>' :
+                (isBest ? '<span class="badge-best">BEST</span>' : '<span class="badge-ok">OK</span>'));
+
+            const showMetrics = isOk && r.tokens_per_sec > 0;
+            html += `<tr class="${cls}" ${isSkip && r.reason ? `title="${r.reason}"` : ''}>
+                <td>${r.label || r.trial}</td>
+                <td class="num">${r.batch_size}</td>
+                <td class="num">${r.seq_length}</td>
+                <td>${r.grad_ckpt ? 'Y' : 'N'}</td>
+                <td class="num">${fmtNum(r.tokens_per_step)}</td>
+                <td class="num">${showMetrics ? fmtNum(r.tokens_per_sec) : '--'}</td>
+                <td class="num">${showMetrics ? r.sec_per_step?.toFixed(2) : '--'}</td>
+                <td class="num">${isSkip ? '--' : (r.peak_mem_gb?.toFixed(1) + ' GB')}</td>
+                <td>${statusBadge}</td>
+            </tr>`;
+        });
+
+        // Show running trial
+        if (currentTrialLabel) {
+            html += `<tr><td>${currentTrialLabel}</td><td colspan="7"></td><td><span class="badge-running">RUNNING</span></td></tr>`;
+        }
+
+        body.innerHTML = html;
+    }
+
+    // ================================================================
+    // Comparison Chart
+    // ================================================================
+    function updateCompChart() {
+        const labels = [];
+        const data = [];
+        const bgColors = [];
+        const borderColors = [];
+
+        // Find best
+        let bestTps = 0;
+        completedResults.forEach(r => { if (!r.oom && r.tokens_per_sec > bestTps) bestTps = r.tokens_per_sec; });
+
+        completedResults.forEach(r => {
+            const isSkip = r.skipped || r.event === 'trial_skip';
+            labels.push(r.label || r.trial);
+            data.push((r.oom || isSkip) ? 0 : r.tokens_per_sec);
+
+            if (isSkip) {
+                bgColors.push(chartColors.yellow + '40');
+                borderColors.push(chartColors.yellow);
+            } else if (r.oom) {
+                bgColors.push(chartColors.red + '60');
+                borderColors.push(chartColors.red);
+            } else if (r.tokens_per_sec === bestTps) {
+                bgColors.push(chartColors.green + '80');
+                borderColors.push(chartColors.green);
+            } else {
+                bgColors.push(chartColors.blue + '60');
+                borderColors.push(chartColors.blue);
+            }
+        });
+
+        compChart.data.labels = labels;
+        compChart.data.datasets[0].data = data;
+        compChart.data.datasets[0].backgroundColor = bgColors;
+        compChart.data.datasets[0].borderColor = borderColors;
+        compChart.update('none');
+    }
+
+    // ================================================================
+    // Process Events
+    // ================================================================
+    function processEvent(data) {
+        const event = data.event;
+
+        if (event === 'bench_start') {
+            benchConfig = data;
+            totalTrials = data.total_trials || 0;
+            completedResults = [];
+            setStatus('running');
+            document.getElementById('trialProgress').textContent = `0 / ${totalTrials} trials`;
+            updateResultsTable();
+            return;
+        }
+
+        if (event === 'trial_start') {
+            currentTrialLabel = data.trial;
+            document.getElementById('currentTrial').textContent = data.trial;
+            document.getElementById('trialFill').style.width = '0%';
+            document.getElementById('stepProgress').textContent = `0 / ${data.num_steps || '?'} steps`;
+            // Clear per-trial charts
+            [tpsChart, lossChart, cpuRamChart, gpuChart].forEach(clearChart);
+            updateResultsTable();
+            return;
+        }
+
+        if (event === 'bench_step') {
+            // Update cards
+            document.getElementById('cardTps').textContent = fmtNum(data.tokens_per_sec);
+            document.getElementById('cardLoss').textContent = data.loss != null ? data.loss.toFixed(4) : '--';
+            document.getElementById('cardStepTime').textContent = data.step_time != null ? data.step_time.toFixed(2) : '--';
+            document.getElementById('cardCpu').textContent = data.cpu_percent != null ? data.cpu_percent.toFixed(0) + '%' : '--';
+            document.getElementById('cardRam').textContent = data.ram_used_gb != null ? data.ram_used_gb.toFixed(1) : '--';
+            document.getElementById('cardRamSub').textContent = data.ram_system_percent != null ? `${data.ram_system_percent}% system` : 'GB';
+            document.getElementById('cardGpu').textContent = data.gpu_allocated_gb != null ? data.gpu_allocated_gb.toFixed(1) : '--';
+            document.getElementById('cardGpuSub').textContent = data.gpu_percent != null ? `${data.gpu_percent}% of ${data.gpu_total_gb?.toFixed(0)} GB` : 'allocated GB';
+            document.getElementById('cardGpuPeak').textContent = data.gpu_peak_gb != null ? data.gpu_peak_gb.toFixed(1) : '--';
+            document.getElementById('cardGrad').textContent = data.grad_norm != null ? data.grad_norm.toFixed(2) : '--';
+
+            // Update progress
+            const step = data.step || 0;
+            const maxSteps = data.max_steps || 1;
+            const pct = Math.min(100, (step / maxSteps) * 100);
+            document.getElementById('trialFill').style.width = pct + '%';
+            document.getElementById('stepProgress').textContent = `${step} / ${maxSteps} steps`;
+
+            // Update per-trial charts
+            pushPoint(tpsChart, step, data.tokens_per_sec);
+            pushPoint(lossChart, step, data.loss);
+
+            // CPU/RAM dual chart
+            if (cpuRamChart.data.labels.length === cpuRamChart.data.datasets[0].data.length) {
+                cpuRamChart.data.labels.push(step);
+            }
+            cpuRamChart.data.datasets[0].data.push(data.cpu_percent);
+            cpuRamChart.data.datasets[1].data.push(data.ram_used_gb);
+            cpuRamChart.update('none');
+
+            // GPU dual chart
+            if (gpuChart.data.labels.length === gpuChart.data.datasets[0].data.length) {
+                gpuChart.data.labels.push(step);
+            }
+            gpuChart.data.datasets[0].data.push(data.gpu_allocated_gb);
+            gpuChart.data.datasets[1].data.push(data.gpu_peak_gb);
+            gpuChart.update('none');
+
+            return;
+        }
+
+        if (event === 'trial_skip') {
+            completedResults.push(data);
+            currentTrialLabel = null;
+            document.getElementById('trialProgress').textContent = `${completedResults.length} / ${totalTrials} trials`;
+            document.getElementById('currentTrial').textContent = `Skipped: ${data.trial}`;
+            updateResultsTable();
+            updateCompChart();
+            return;
+        }
+
+        if (event === 'trial_end') {
+            completedResults.push(data);
+            currentTrialLabel = null;
+            document.getElementById('trialProgress').textContent = `${completedResults.length} / ${totalTrials} trials`;
+            document.getElementById('trialFill').style.width = '100%';
+            updateResultsTable();
+            updateCompChart();
+            return;
+        }
+
+        if (event === 'bench_end') {
+            setStatus('complete');
+            completedResults = data.results || completedResults;
+            currentTrialLabel = null;
+            document.getElementById('currentTrial').textContent = 'Complete';
+            document.getElementById('trialProgress').textContent = `${completedResults.length} / ${totalTrials} trials`;
+            updateResultsTable();
+            updateCompChart();
+            return;
+        }
+    }
+
+    // ================================================================
+    // SSE Connection
+    // ================================================================
+    function connect() {
+        const source = new EventSource('/bench/stream');
+
+        source.onopen = () => {
+            setConnection(true);
+        };
+
+        source.onmessage = (e) => {
+            try {
+                processEvent(JSON.parse(e.data));
+            } catch (err) {
+                console.warn('Parse error:', err);
+            }
+        };
+
+        source.onerror = () => {
+            setConnection(false);
+            source.close();
+            setTimeout(connect, 3000);
+        };
+    }
+
+    // ================================================================
+    // Init — restore state on page reload
+    // ================================================================
+    (async function init() {
+        try {
+            const res = await fetch('/bench/state');
+            const state = await res.json();
+
+            if (state.status && state.status !== 'idle') {
+                setStatus(state.status);
+                totalTrials = state.config?.total_trials || state.trials?.length || 0;
+                completedResults = state.results || [];
+                currentTrialLabel = state.current_trial;
+
+                document.getElementById('trialProgress').textContent = `${completedResults.length} / ${totalTrials} trials`;
+                if (currentTrialLabel) {
+                    document.getElementById('currentTrial').textContent = currentTrialLabel;
+                } else if (state.status === 'complete') {
+                    document.getElementById('currentTrial').textContent = 'Complete';
+                }
+
+                updateResultsTable();
+                updateCompChart();
+            }
+        } catch (e) {}
+
+        // Replay per-step history for current trial charts
+        try {
+            const res = await fetch('/bench/history');
+            const history = await res.json();
+            history.forEach(d => {
+                if (d.event === 'bench_step' && d.trial === currentTrialLabel) {
+                    processEvent(d);
+                }
+            });
+        } catch (e) {}
+
+        connect();
+    })();
+    </script>
+</body>
+</html>

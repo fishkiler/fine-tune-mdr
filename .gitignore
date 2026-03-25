@@ -1,0 +1,39 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+
+# Large data directories
+data/
+outputs/
+adapters/
+mdr-database/
+docs/cves/
+
+# Caches
+__pycache__/
+*.pyc
+*.pyo
+unsloth_compiled_cache/
+.cache/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+tasks/
+
+# Scratch pad (contains credentials)
+docs/scratch-pad.md

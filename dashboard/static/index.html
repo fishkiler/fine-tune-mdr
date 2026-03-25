@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fine-Tune MDR — Training Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* ============================================================
+           Dark Cybersecurity Theme
+           ============================================================ */
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a25;
+            --border: #1e1e2e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #8888aa;
+            --text-muted: #555577;
+            --cyber-green: #00ff88;
+            --cyber-green-dim: #00cc6a;
+            --cyber-blue: #00aaff;
+            --cyber-red: #ff4466;
+            --cyber-yellow: #ffaa00;
+            --cyber-purple: #aa66ff;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ============================================================
+           Top Bar
+           ============================================================ */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--cyber-green);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .status-waiting { background: var(--text-muted); color: var(--bg-primary); }
+        .status-training { background: var(--cyber-green); color: var(--bg-primary); animation: pulse 2s infinite; }
+        .status-complete { background: var(--cyber-blue); color: var(--bg-primary); }
+        .status-error { background: var(--cyber-red); color: white; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* ============================================================
+           Layout
+           ============================================================ */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* ============================================================
+           Metric Cards
+           ============================================================ */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            transition: border-color 0.2s;
+        }
+        .card:hover { border-color: var(--cyber-green-dim); }
+
+        .card-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--cyber-green);
+        }
+        .card-value.blue { color: var(--cyber-blue); }
+        .card-value.yellow { color: var(--cyber-yellow); }
+        .card-value.purple { color: var(--cyber-purple); }
+
+        .card-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* ============================================================
+           Progress Bars
+           ============================================================ */
+        .progress-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .progress-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .progress-label { color: var(--text-secondary); }
+        .progress-value { color: var(--text-primary); }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .progress-fill.green { background: var(--cyber-green); }
+        .progress-fill.blue { background: var(--cyber-blue); }
+        .progress-fill.yellow { background: var(--cyber-yellow); }
+
+        /* ============================================================
+           Charts
+           ============================================================ */
+        .charts {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .chart-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+
+        /* ============================================================
+           Responsive
+           ============================================================ */
+        @media (max-width: 900px) {
+            .charts { grid-template-columns: 1fr; }
+        }
+
+        /* ============================================================
+           Connection indicator
+           ============================================================ */
+        .connection {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--cyber-red);
+        }
+        .connection-dot.connected { background: var(--cyber-green); }
+
+        /* ============================================================
+           Tooltips
+           ============================================================ */
+        .tip-wrap {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1px solid var(--text-muted);
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: bold;
+            cursor: help;
+            margin-left: 6px;
+            vertical-align: middle;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .tip-icon:hover {
+            border-color: var(--cyber-blue);
+            color: var(--cyber-blue);
+            background: rgba(0,170,255,0.1);
+        }
+
+        .tip-content {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            padding: 12px 14px;
+            background: #1a1a28;
+            border: 1px solid var(--cyber-blue);
+            border-radius: 8px;
+            font-size: 11px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+        .tip-content::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--cyber-blue);
+        }
+        .tip-wrap:hover .tip-content { display: block; }
+
+        .tip-content strong {
+            color: var(--text-primary);
+        }
+
+        .tip-ranges {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+        }
+        .tip-range {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 3px;
+            font-size: 10px;
+        }
+        .tip-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .tip-dot.excellent { background: var(--cyber-green); }
+        .tip-dot.good { background: var(--cyber-blue); }
+        .tip-dot.normal { background: var(--cyber-yellow); }
+        .tip-dot.bad { background: var(--cyber-red); }
+
+        /* ============================================================
+           Fine-Tuning Quality Indicator
+           ============================================================ */
+        .quality-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .quality-label-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .quality-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        .quality-badge {
+            padding: 4px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            min-width: 100px;
+            text-align: center;
+        }
+        .quality-waiting {
+            background: var(--text-muted);
+            color: var(--bg-primary);
+        }
+        .quality-excellent {
+            background: var(--cyber-green);
+            color: var(--bg-primary);
+        }
+        .quality-good {
+            background: var(--cyber-blue);
+            color: var(--bg-primary);
+        }
+        .quality-normal {
+            background: var(--cyber-yellow);
+            color: var(--bg-primary);
+        }
+        .quality-bad {
+            background: var(--cyber-red);
+            color: white;
+        }
+
+        .quality-details {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+
+        .quality-factor {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .quality-factor-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .quality-summary {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-left: auto;
+            text-align: right;
+            max-width: 340px;
+        }
+
+        /* ============================================================
+           Data Refresh Panel
+           ============================================================ */
+        .refresh-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .refresh-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .refresh-title {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--cyber-blue);
+        }
+
+        .refresh-status-badge {
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .refresh-idle { background: var(--text-muted); color: var(--bg-primary); }
+        .refresh-running { background: var(--cyber-yellow); color: var(--bg-primary); animation: pulse 2s infinite; }
+        .refresh-complete { background: var(--cyber-green); color: var(--bg-primary); }
+        .refresh-error { background: var(--cyber-red); color: white; }
+
+        .refresh-body {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .refresh-body { grid-template-columns: 1fr; }
+        }
+
+        .refresh-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .refresh-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .refresh-stat {
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .refresh-stat-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .refresh-stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .refresh-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .refresh-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .refresh-option label {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .refresh-option input[type="number"] {
+            width: 80px;
+            padding: 4px 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .refresh-option input[type="checkbox"] {
+            accent-color: var(--cyber-blue);
+        }
+
+        .refresh-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--cyber-blue);
+            color: var(--bg-primary);
+            border-color: var(--cyber-blue);
+            flex: 1;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #0099ee;
+        }
+
+        .btn-danger {
+            background: transparent;
+            color: var(--cyber-red);
+            border-color: var(--cyber-red);
+        }
+        .btn-danger:hover:not(:disabled) {
+            background: var(--cyber-red);
+            color: white;
+        }
+
+        .refresh-log {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            overflow-y: auto;
+            max-height: 300px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .refresh-log .log-line-success {
+            color: var(--cyber-green);
+        }
+
+        .refresh-log .log-line-error {
+            color: var(--cyber-red);
+        }
+
+        .refresh-log .log-line-info {
+            color: var(--cyber-blue);
+        }
+
+        .refresh-log-empty {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* ============================================================
+           Training Control Panel
+           ============================================================ */
+        .train-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .train-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .train-title {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--cyber-green);
+        }
+
+        .train-process-badge {
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .tp-idle { background: var(--text-muted); color: var(--bg-primary); }
+        .tp-running { background: var(--cyber-green); color: var(--bg-primary); animation: pulse 2s infinite; }
+        .tp-stopping { background: var(--cyber-yellow); color: var(--bg-primary); animation: pulse 1s infinite; }
+        .tp-complete { background: var(--cyber-blue); color: var(--bg-primary); }
+        .tp-error { background: var(--cyber-red); color: white; }
+
+        .train-body {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .train-body { grid-template-columns: 1fr; }
+        }
+
+        .train-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .train-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .train-option input[type="checkbox"] {
+            accent-color: var(--cyber-green);
+        }
+
+        .train-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-green {
+            background: var(--cyber-green);
+            color: var(--bg-primary);
+            border-color: var(--cyber-green);
+            flex: 1;
+        }
+        .btn-green:hover:not(:disabled) {
+            background: var(--cyber-green-dim);
+        }
+
+        .train-log {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            overflow-y: auto;
+            max-height: 300px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .train-log .log-warning { color: var(--cyber-yellow); }
+        .train-log .log-error { color: var(--cyber-red); }
+        .train-log .log-success { color: var(--cyber-green); }
+        .train-log .log-info { color: var(--cyber-blue); }
+
+        .train-log-empty {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* ============================================================
+           Temperature Cards
+           ============================================================ */
+        .temp-green { color: var(--cyber-green) !important; }
+        .temp-yellow { color: var(--cyber-yellow) !important; }
+        .temp-red { color: var(--cyber-red) !important; }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================================
+         Top Bar
+         ============================================================ -->
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <span class="logo">&gt;_ Fine-Tune MDR</span>
+            <span id="statusBadge" class="status-badge status-waiting">Waiting</span>
+        </div>
+        <div class="top-bar-right">
+            <span id="modelName">Foundation-Sec-8B-Instruct</span>
+            <span id="elapsed">00:00:00</span>
+            <div class="connection">
+                <div id="connDot" class="connection-dot"></div>
+                <span id="connLabel">Disconnected</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- ============================================================
+             Training Control Panel
+             ============================================================ -->
+        <div class="train-panel">
+            <div class="train-header">
+                <span class="train-title">Training Control
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content" style="left:0;transform:none;">
+                            <strong>Training Process Control</strong><br>
+                            Start and stop training runs from the dashboard. Training auto-resumes from the latest checkpoint by default. Use "Start Fresh" to ignore existing checkpoints and begin a new run. Stop sends a cooperative shutdown signal — the model finishes its current step and saves a proper checkpoint before exiting.
+                        </span>
+                    </span>
+                </span>
+                <span id="trainProcessBadge" class="train-process-badge tp-idle">Idle</span>
+            </div>
+            <div class="train-body">
+                <div class="train-controls">
+                    <div class="train-option">
+                        <input type="checkbox" id="trainFresh">
+                        <label for="trainFresh">Start fresh (ignore checkpoints)</label>
+                    </div>
+                    <div class="train-buttons">
+                        <button class="btn btn-green" id="btnStartTrain" onclick="startTraining()">Start Training</button>
+                        <button class="btn btn-danger" id="btnStopTrain" onclick="stopTraining()" disabled>Stop</button>
+                    </div>
+                </div>
+                <div class="train-log" id="trainLog">
+                    <span class="train-log-empty">Click "Start Training" to begin. Auto-resumes from latest checkpoint.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Fine-Tuning Quality Indicator
+             ============================================================ -->
+        <div class="quality-panel">
+            <div class="quality-label-section">
+                <span class="quality-label">Fine-Tuning Status</span>
+                <span id="qualityBadge" class="quality-badge quality-waiting">Waiting</span>
+                <span class="tip-wrap">
+                    <span class="tip-icon">?</span>
+                    <span class="tip-content">
+                        <strong>Fine-Tuning Quality Score</strong><br>
+                        Overall assessment of training health based on loss value, loss trend, gradient stability, and GPU headroom.
+                        <div class="tip-ranges">
+                            <div class="tip-range"><span class="tip-dot excellent"></span> <strong>Excellent</strong> — Loss &lt;0.5, steadily decreasing, stable gradients</div>
+                            <div class="tip-range"><span class="tip-dot good"></span> <strong>Good</strong> — Loss &lt;1.0, trending down, minor gradient fluctuations</div>
+                            <div class="tip-range"><span class="tip-dot normal"></span> <strong>Normal</strong> — Loss &lt;2.0, typical for early/mid training</div>
+                            <div class="tip-range"><span class="tip-dot bad"></span> <strong>Bad</strong> — Loss &gt;2.0, rising loss, or exploding gradients</div>
+                        </div>
+                    </span>
+                </span>
+            </div>
+            <div class="quality-details" id="qualityDetails">
+                <div class="quality-factor"><span class="quality-factor-dot" id="qDotLoss" style="background:var(--text-muted)"></span> Loss: <span id="qLoss">--</span></div>
+                <div class="quality-factor"><span class="quality-factor-dot" id="qDotTrend" style="background:var(--text-muted)"></span> Trend: <span id="qTrend">--</span></div>
+                <div class="quality-factor"><span class="quality-factor-dot" id="qDotGrad" style="background:var(--text-muted)"></span> Gradients: <span id="qGrad">--</span></div>
+                <div class="quality-factor"><span class="quality-factor-dot" id="qDotGpu" style="background:var(--text-muted)"></span> GPU: <span id="qGpu">--</span></div>
+            </div>
+            <div class="quality-summary" id="qualitySummary">Awaiting training data...</div>
+        </div>
+
+        <div class="cards">
+            <div class="card">
+                <div class="card-label">Loss
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Training Loss</strong><br>
+                            Measures how wrong the model's predictions are. Lower is better. Should steadily decrease during training.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &lt;0.5 — Excellent convergence</div>
+                                <div class="tip-range"><span class="tip-dot good"></span> 0.5–1.0 — Good, model is learning well</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 1.0–2.0 — Normal for early training</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;2.0 — Needs attention, check LR or data</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value" id="cardLoss">—</div>
+                <div class="card-sub" id="cardLossSub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">Learning Rate
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Learning Rate</strong><br>
+                            Controls how fast the model updates its weights each step. Uses a cosine schedule: starts at peak (2e-4), gradually decays to near zero.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot good"></span> Smooth cosine decay is expected</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> Warmup phase rises in the first few steps</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> Too high = unstable loss spikes</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> Too low = model stops learning</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value blue" id="cardLR">—</div>
+                <div class="card-sub" id="cardLRSub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">Speed
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Training Speed</strong><br>
+                            Throughput in samples processed per second. Depends on GPU, batch size, and sequence length. Does not affect model quality — purely a time efficiency metric.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &gt;8 samples/sec — Excellent throughput</div>
+                                <div class="tip-range"><span class="tip-dot good"></span> 4–8 — Typical for 8B model on DGX Spark</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 2–4 — Slower but fine with long sequences</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &lt;1 — Check GPU utilization or batch size</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value yellow" id="cardSpeed">—</div>
+                <div class="card-sub">samples/sec</div>
+            </div>
+            <div class="card">
+                <div class="card-label">ETA
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Estimated Time Remaining</strong><br>
+                            Time until training completes, based on current speed and remaining steps. Updates dynamically — may fluctuate early on and stabilize as training progresses.
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value purple" id="cardETA">—</div>
+                <div class="card-sub" id="cardETASub"></div>
+            </div>
+            <div class="card">
+                <div class="card-label">CPU Temp (Max)
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>CPU Temperature (Max)</strong><br>
+                            Hottest reading across all ACPI thermal zones (includes VRMs, chipset). May read higher than CPU die.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &lt;60°C — Cool, plenty of headroom</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 60–75°C — Warm but normal under load</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;75°C — Hot, may throttle</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value" id="cardCpuTemp">—</div>
+                <div class="card-sub">°C</div>
+            </div>
+            <div class="card">
+                <div class="card-label">CPU Temp (Avg)
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>CPU Temperature (Average)</strong><br>
+                            Average across all ACPI thermal zones. Closer to actual CPU die temperature reported by btop.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &lt;55°C — Cool</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 55–70°C — Normal under load</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;70°C — Hot, check cooling</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value" id="cardCpuTempAvg">—</div>
+                <div class="card-sub">°C</div>
+            </div>
+            <div class="card">
+                <div class="card-label">GPU Temp
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>GPU Temperature</strong><br>
+                            GPU die temperature from NVIDIA driver. GPUs can safely run hotter than CPUs but sustained high temps reduce lifespan.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> &lt;60°C — Cool</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 60–75°C — Normal under training load</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;75°C — Hot, check cooling</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="card-value" id="cardGpuTemp">—</div>
+                <div class="card-sub">°C</div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Progress Bars
+             ============================================================ -->
+        <div class="progress-section">
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-label">Epoch Progress
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content">
+                                <strong>Epoch Progress</strong><br>
+                                One epoch = one full pass through the entire training dataset. Training for 2 epochs means the model sees every example twice. More epochs improve learning but too many risk overfitting (memorizing rather than generalizing).
+                                <div class="tip-ranges">
+                                    <div class="tip-range"><span class="tip-dot good"></span> 1–3 epochs is typical for LoRA fine-tuning</div>
+                                    <div class="tip-range"><span class="tip-dot bad"></span> &gt;5 epochs risks overfitting on small datasets</div>
+                                </div>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="progress-value" id="epochText">0 / 0</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill green" id="epochFill" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-label">Step Progress
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content">
+                                <strong>Step Progress</strong><br>
+                                One step = processing one batch of training examples and updating model weights. Total steps = (dataset_size / batch_size / gradient_accumulation) x epochs. Each step performs a forward pass, computes loss, and backpropagates gradients.
+                            </span>
+                        </span>
+                    </span>
+                    <span class="progress-value" id="stepText">0 / 0</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill blue" id="stepFill" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="progress-card">
+                <div class="progress-header">
+                    <span class="progress-label">GPU Memory
+                        <span class="tip-wrap">
+                            <span class="tip-icon">?</span>
+                            <span class="tip-content">
+                                <strong>GPU VRAM Usage</strong><br>
+                                Video memory consumed by the model, optimizer states, and activations. QLoRA (4-bit) keeps this much lower than full fine-tuning.
+                                <div class="tip-ranges">
+                                    <div class="tip-range"><span class="tip-dot excellent"></span> &lt;70% — Plenty of headroom</div>
+                                    <div class="tip-range"><span class="tip-dot good"></span> 70–85% — Comfortable for training</div>
+                                    <div class="tip-range"><span class="tip-dot normal"></span> 85–95% — Tight but workable</div>
+                                    <div class="tip-range"><span class="tip-dot bad"></span> &gt;95% — Risk of out-of-memory crash</div>
+                                </div>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="progress-value" id="gpuText">— / — GB</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill yellow" id="gpuFill" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Charts (2x2)
+             ============================================================ -->
+        <div class="charts">
+            <div class="chart-card">
+                <div class="chart-title">Training Loss
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Training Loss Over Time</strong><br>
+                            Should show a smooth downward curve. Small spikes are normal, especially early on. If loss <strong>plateaus</strong>, the learning rate may be too low or the model has converged. If loss <strong>increases</strong> after decreasing, the model may be overfitting.
+                        </span>
+                    </span>
+                </div>
+                <div class="chart-container"><canvas id="lossChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Learning Rate Schedule
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>LR Schedule (Cosine Decay)</strong><br>
+                            This chart should show a smooth cosine curve — rising during warmup steps, peaking, then gradually decaying toward zero. This is <strong>expected behavior</strong> and is not a problem. The cosine schedule prevents abrupt learning rate changes that could destabilize training.
+                        </span>
+                    </span>
+                </div>
+                <div class="chart-container"><canvas id="lrChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Gradient Norm
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>Gradient Norm</strong><br>
+                            Measures the magnitude of weight updates per step. Indicates training stability.
+                            <div class="tip-ranges">
+                                <div class="tip-range"><span class="tip-dot excellent"></span> 0.1–5.0 — Stable, healthy gradients</div>
+                                <div class="tip-range"><span class="tip-dot good"></span> 5–15 — Acceptable fluctuations</div>
+                                <div class="tip-range"><span class="tip-dot normal"></span> 15–50 — Worth monitoring</div>
+                                <div class="tip-range"><span class="tip-dot bad"></span> &gt;50 — Exploding gradients, reduce LR</div>
+                            </div>
+                        </span>
+                    </span>
+                </div>
+                <div class="chart-container"><canvas id="gradChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">GPU Memory (GB)
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content">
+                            <strong>GPU Memory Over Time</strong><br>
+                            Should remain <strong>stable</strong> with minor fluctuations during training. A gradual upward trend could indicate a memory leak. Sudden drops happen during checkpointing when optimizer states are temporarily offloaded.
+                        </span>
+                    </span>
+                </div>
+                <div class="chart-container"><canvas id="gpuChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Data Refresh Panel
+             ============================================================ -->
+        <div class="refresh-panel">
+            <div class="refresh-header">
+                <span class="refresh-title">Dataset Refresh
+                    <span class="tip-wrap">
+                        <span class="tip-icon">?</span>
+                        <span class="tip-content" style="left:0;transform:none;">
+                            <strong>Dataset Refresh Pipeline</strong><br>
+                            Pulls fresh CVE vulnerability data from <strong>MITRE</strong>, <strong>NVD</strong>, and <strong>ExploitDB</strong> using the pentestds builder. Merges with your custom training examples and re-splits into train/val/test. Run monthly to keep the model current with new threats. A full build (15 years) takes 20min–1hr; a quick refresh (90 days) takes 1–3 min.
+                        </span>
+                    </span>
+                </span>
+                <span id="refreshBadge" class="refresh-status-badge refresh-idle">Idle</span>
+            </div>
+            <div class="refresh-body">
+                <div class="refresh-controls">
+                    <div class="refresh-stats">
+                        <div class="refresh-stat">
+                            <div class="refresh-stat-label">Total Examples</div>
+                            <div class="refresh-stat-value" id="statTotal">--</div>
+                        </div>
+                        <div class="refresh-stat">
+                            <div class="refresh-stat-label">Custom</div>
+                            <div class="refresh-stat-value" id="statCustom">--</div>
+                        </div>
+                        <div class="refresh-stat">
+                            <div class="refresh-stat-label">Train</div>
+                            <div class="refresh-stat-value" id="statTrain">--</div>
+                        </div>
+                        <div class="refresh-stat">
+                            <div class="refresh-stat-label">Last Refresh</div>
+                            <div class="refresh-stat-value" id="statRefresh">--</div>
+                        </div>
+                    </div>
+                    <div class="refresh-options">
+                        <div class="refresh-option">
+                            <label for="daysBack">CVE lookback (days)</label>
+                            <input type="number" id="daysBack" value="5475" min="1" max="10000">
+                        </div>
+                        <div class="refresh-option">
+                            <input type="checkbox" id="skipBuild">
+                            <label for="skipBuild">Skip pentestds build (re-merge only)</label>
+                        </div>
+                    </div>
+                    <div class="refresh-buttons">
+                        <button class="btn btn-primary" id="btnRefresh" onclick="startRefresh()">Refresh Dataset</button>
+                        <button class="btn btn-danger" id="btnCancel" onclick="cancelRefresh()" disabled>Cancel</button>
+                    </div>
+                </div>
+                <div class="refresh-log" id="refreshLog">
+                    <span class="refresh-log-empty">Click "Refresh Dataset" to pull fresh CVE data from MITRE, NVD, and ExploitDB.</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============================================================
+         JavaScript
+         ============================================================ -->
+    <script>
+        // ============================================================
+        // Chart Setup
+        // ============================================================
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 0 },
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    grid: { color: '#1e1e2e' },
+                    ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } },
+                },
+                y: {
+                    grid: { color: '#1e1e2e' },
+                    ticks: { color: '#555577', font: { family: "'JetBrains Mono', monospace", size: 10 } },
+                },
+            },
+        };
+
+        function makeChart(id, color, yLabel, showEMA = false) {
+            const ctx = document.getElementById(id).getContext('2d');
+            const datasets = [{
+                data: [],
+                borderColor: showEMA ? color + '4D' : color,
+                backgroundColor: showEMA ? color + '1A' : color + '20',
+                borderWidth: showEMA ? 1 : 1.5,
+                pointRadius: 0,
+                fill: true,
+                tension: 0.3,
+            }];
+            if (showEMA) {
+                datasets.push({
+                    data: [],
+                    borderColor: color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.3,
+                });
+            }
+            return new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        ...chartDefaults.scales,
+                        y: {
+                            ...chartDefaults.scales.y,
+                            title: { display: true, text: yLabel, color: '#555577', font: { size: 10 } },
+                        },
+                    },
+                },
+            });
+        }
+
+        const lossChart = makeChart('lossChart', '#00ff88', 'Loss', true);
+        const lrChart = makeChart('lrChart', '#00aaff', 'LR');
+        const gradChart = makeChart('gradChart', '#ffaa00', 'Norm', true);
+        const gpuChart = makeChart('gpuChart', '#aa66ff', 'GB');
+
+        const EMA_ALPHA = 0.1;
+        const emaState = new Map();  // chart -> last EMA value
+
+        function pushPoint(chart, step, value, maxPoints = 500) {
+            if (value == null || value === undefined) return;
+            chart.data.labels.push(step);
+            chart.data.datasets[0].data.push(value);
+            // EMA trend line (second dataset, if present)
+            if (chart.data.datasets.length > 1) {
+                const prev = emaState.get(chart);
+                const ema = prev == null ? value : EMA_ALPHA * value + (1 - EMA_ALPHA) * prev;
+                emaState.set(chart, ema);
+                chart.data.datasets[1].data.push(ema);
+            }
+            // Downsample if too many points
+            if (chart.data.labels.length > maxPoints) {
+                const skip = Math.floor(chart.data.labels.length / maxPoints);
+                chart.data.labels = chart.data.labels.filter((_, i) => i % skip === 0);
+                for (const ds of chart.data.datasets) {
+                    ds.data = ds.data.filter((_, i) => i % skip === 0);
+                }
+            }
+            chart.update('none');
+        }
+
+        // ============================================================
+        // State
+        // ============================================================
+        let config = {};
+        let startTime = null;
+        let elapsedInterval = null;
+
+        // ============================================================
+        // Time Formatting
+        // ============================================================
+        function fmtTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+        }
+
+        function startElapsedTimer() {
+            if (elapsedInterval) return;
+            elapsedInterval = setInterval(() => {
+                if (startTime) {
+                    const elapsed = (Date.now() / 1000) - startTime;
+                    document.getElementById('elapsed').textContent = fmtTime(elapsed);
+                }
+            }, 1000);
+        }
+
+        // ============================================================
+        // UI Updates
+        // ============================================================
+        function setStatus(status) {
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'status-badge status-' + status;
+            badge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+
+        function setConnection(connected) {
+            document.getElementById('connDot').className = 'connection-dot' + (connected ? ' connected' : '');
+            document.getElementById('connLabel').textContent = connected ? 'Connected' : 'Disconnected';
+        }
+
+        function processEvent(data) {
+            const event = data.event;
+
+            if (event === 'train_begin') {
+                config = data;
+                startTime = data.timestamp;
+                setStatus('training');
+                startElapsedTimer();
+                return;
+            }
+
+            if (event === 'train_end') {
+                setStatus('complete');
+                if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
+                return;
+            }
+
+            if (event !== 'metrics') return;
+
+            const step = data.step || 0;
+            const maxSteps = data.max_steps || config.max_steps || 1;
+            const numEpochs = config.num_epochs || 2;
+
+            // Cards
+            if (data.loss != null) {
+                document.getElementById('cardLoss').textContent = data.loss.toFixed(4);
+            }
+            if (data.learning_rate != null) {
+                document.getElementById('cardLR').textContent = data.learning_rate.toExponential(2);
+            }
+            if (data.samples_per_sec != null) {
+                document.getElementById('cardSpeed').textContent = data.samples_per_sec.toFixed(1);
+            }
+            if (data.eta_seconds != null && data.eta_seconds > 0) {
+                document.getElementById('cardETA').textContent = fmtTime(data.eta_seconds);
+            }
+
+            // Progress bars
+            const stepPct = Math.min(100, (step / maxSteps) * 100);
+            document.getElementById('stepFill').style.width = stepPct + '%';
+            document.getElementById('stepText').textContent = step + ' / ' + maxSteps;
+
+            const epoch = data.epoch || 0;
+            const epochPct = Math.min(100, (epoch / numEpochs) * 100);
+            document.getElementById('epochFill').style.width = epochPct + '%';
+            document.getElementById('epochText').textContent = epoch.toFixed(2) + ' / ' + numEpochs;
+
+            if (data.gpu_memory_allocated_gb != null && data.gpu_memory_total_gb) {
+                const gpuPct = (data.gpu_memory_allocated_gb / data.gpu_memory_total_gb) * 100;
+                document.getElementById('gpuFill').style.width = gpuPct + '%';
+                document.getElementById('gpuText').textContent =
+                    data.gpu_memory_allocated_gb.toFixed(1) + ' / ' + data.gpu_memory_total_gb.toFixed(1) + ' GB';
+            }
+
+            // Temperature cards
+            updateTemp('cardCpuTemp', data.cpu_temp_c);
+            updateTemp('cardCpuTempAvg', data.cpu_temp_avg_c);
+            updateTemp('cardGpuTemp', data.gpu_temp_c);
+
+            // Charts
+            pushPoint(lossChart, step, data.loss);
+            pushPoint(lrChart, step, data.learning_rate);
+            pushPoint(gradChart, step, data.grad_norm);
+            pushPoint(gpuChart, step, data.gpu_memory_allocated_gb);
+
+            // Quality assessment
+            assessQuality(data);
+        }
+
+        // ============================================================
+        // SSE Connection
+        // ============================================================
+        function connect() {
+            const source = new EventSource('/metrics');
+
+            source.onopen = () => {
+                setConnection(true);
+                console.log('[Dashboard] SSE connected');
+            };
+
+            source.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    processEvent(data);
+                } catch (err) {
+                    console.warn('[Dashboard] Parse error:', err);
+                }
+            };
+
+            source.onerror = () => {
+                setConnection(false);
+                source.close();
+                console.log('[Dashboard] SSE disconnected — reconnecting in 3s...');
+                setTimeout(connect, 3000);
+            };
+        }
+
+        // ============================================================
+        // Fine-Tuning Quality Rating
+        // ============================================================
+        const lossHistory = [];
+        const gradHistory = [];
+        const HISTORY_WINDOW = 50;  // steps to track for trend analysis
+
+        function rateColor(level) {
+            return { excellent: '#00ff88', good: '#00aaff', normal: '#ffaa00', bad: '#ff4466', waiting: '#555577' }[level] || '#555577';
+        }
+
+        function assessQuality(data) {
+            const loss = data.loss;
+            const gradNorm = data.grad_norm;
+            const gpuAlloc = data.gpu_memory_allocated_gb;
+            const gpuTotal = data.gpu_memory_total_gb;
+
+            if (loss == null) return;
+
+            // Track history
+            lossHistory.push(loss);
+            if (lossHistory.length > HISTORY_WINDOW) lossHistory.shift();
+            if (gradNorm != null) {
+                gradHistory.push(gradNorm);
+                if (gradHistory.length > HISTORY_WINDOW) gradHistory.shift();
+            }
+
+            // --- Loss rating ---
+            let lossRating, lossLabel;
+            if (loss < 0.5) { lossRating = 'excellent'; lossLabel = 'Excellent'; }
+            else if (loss < 1.0) { lossRating = 'good'; lossLabel = 'Good'; }
+            else if (loss < 2.0) { lossRating = 'normal'; lossLabel = 'Normal'; }
+            else { lossRating = 'bad'; lossLabel = 'High'; }
+
+            document.getElementById('qLoss').textContent = loss.toFixed(3) + ' (' + lossLabel + ')';
+            document.getElementById('qDotLoss').style.background = rateColor(lossRating);
+
+            // --- Trend rating ---
+            let trendRating = 'normal', trendLabel = 'Analyzing...';
+            if (lossHistory.length >= 10) {
+                const recent = lossHistory.slice(-10);
+                const older = lossHistory.slice(-20, -10);
+                if (older.length >= 5) {
+                    const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+                    const olderAvg = older.reduce((a, b) => a + b, 0) / older.length;
+                    const change = (recentAvg - olderAvg) / olderAvg;
+                    if (change < -0.10) { trendRating = 'excellent'; trendLabel = 'Decreasing fast'; }
+                    else if (change < -0.02) { trendRating = 'good'; trendLabel = 'Decreasing'; }
+                    else if (change < 0.02) { trendRating = 'normal'; trendLabel = 'Plateaued'; }
+                    else { trendRating = 'bad'; trendLabel = 'Increasing'; }
+                }
+            }
+            document.getElementById('qTrend').textContent = trendLabel;
+            document.getElementById('qDotTrend').style.background = rateColor(trendRating);
+
+            // --- Gradient rating ---
+            let gradRating = 'normal', gradLabel = '--';
+            if (gradHistory.length >= 3) {
+                const recent = gradHistory.slice(-5);
+                const maxGrad = Math.max(...recent);
+                const avgGrad = recent.reduce((a, b) => a + b, 0) / recent.length;
+                if (avgGrad <= 5) { gradRating = 'excellent'; gradLabel = 'Stable'; }
+                else if (avgGrad <= 15) { gradRating = 'good'; gradLabel = 'Normal'; }
+                else if (maxGrad <= 50) { gradRating = 'normal'; gradLabel = 'Fluctuating'; }
+                else { gradRating = 'bad'; gradLabel = 'Exploding'; }
+            }
+            document.getElementById('qGrad').textContent = gradLabel;
+            document.getElementById('qDotGrad').style.background = rateColor(gradRating);
+
+            // --- GPU rating ---
+            let gpuRating = 'normal', gpuLabel = '--';
+            if (gpuAlloc != null && gpuTotal != null && gpuTotal > 0) {
+                const pct = (gpuAlloc / gpuTotal) * 100;
+                if (pct < 70) { gpuRating = 'excellent'; gpuLabel = 'Plenty'; }
+                else if (pct < 85) { gpuRating = 'good'; gpuLabel = 'Comfortable'; }
+                else if (pct < 95) { gpuRating = 'normal'; gpuLabel = 'Tight'; }
+                else { gpuRating = 'bad'; gpuLabel = 'Critical'; }
+            }
+            document.getElementById('qGpu').textContent = gpuLabel;
+            document.getElementById('qDotGpu').style.background = rateColor(gpuRating);
+
+            // --- Overall quality ---
+            const scores = { excellent: 3, good: 2, normal: 1, bad: 0 };
+            const factors = [lossRating, trendRating, gradRating, gpuRating];
+            // Weight loss and trend higher
+            const weighted = scores[lossRating] * 2 + scores[trendRating] * 2 + scores[gradRating] + scores[gpuRating];
+            const maxScore = 3 * 2 + 3 * 2 + 3 + 3;  // 18
+            const pct = weighted / maxScore;
+
+            let overall, overallLabel, summary;
+            if (factors.includes('bad') && (lossRating === 'bad' || trendRating === 'bad')) {
+                overall = 'bad';
+                overallLabel = 'Bad';
+                summary = 'Training needs attention. Check loss trend and gradients.';
+            } else if (pct >= 0.80) {
+                overall = 'excellent';
+                overallLabel = 'Excellent';
+                summary = 'Training is converging smoothly with stable metrics.';
+            } else if (pct >= 0.55) {
+                overall = 'good';
+                overallLabel = 'Good';
+                summary = 'Training is progressing well. Monitor trends.';
+            } else if (pct >= 0.30) {
+                overall = 'normal';
+                overallLabel = 'Normal';
+                summary = 'Typical for early/mid training. Loss should decrease over time.';
+            } else {
+                overall = 'bad';
+                overallLabel = 'Bad';
+                summary = 'Multiple metrics showing concern. Review training config.';
+            }
+
+            const badge = document.getElementById('qualityBadge');
+            badge.className = 'quality-badge quality-' + overall;
+            badge.textContent = overallLabel;
+            document.getElementById('qualitySummary').textContent = summary;
+        }
+
+        // ============================================================
+        // Temperature Card Updates
+        // ============================================================
+        function tempColor(c) {
+            if (c == null) return '';
+            if (c < 60) return 'temp-green';
+            if (c < 75) return 'temp-yellow';
+            return 'temp-red';
+        }
+
+        function updateTemp(id, value) {
+            const el = document.getElementById(id);
+            if (value == null) return;
+            el.textContent = value.toFixed ? value.toFixed(0) : value;
+            el.className = 'card-value ' + tempColor(value);
+        }
+
+        // ============================================================
+        // Training Process Control
+        // ============================================================
+        let trainLogSource = null;
+
+        function setTrainProcessStatus(status) {
+            const badge = document.getElementById('trainProcessBadge');
+            badge.className = 'train-process-badge tp-' + status;
+            const labels = { idle: 'Idle', running: 'Running', stopping: 'Stopping', complete: 'Complete', error: 'Error' };
+            badge.textContent = labels[status] || status;
+
+            const isRunning = (status === 'running' || status === 'stopping');
+            document.getElementById('btnStartTrain').disabled = isRunning;
+            document.getElementById('btnStopTrain').disabled = !isRunning || status === 'stopping';
+            document.getElementById('trainFresh').disabled = isRunning;
+        }
+
+        function appendTrainLog(text) {
+            const log = document.getElementById('trainLog');
+            const empty = log.querySelector('.train-log-empty');
+            if (empty) empty.remove();
+
+            const line = document.createElement('div');
+            const lower = text.toLowerCase();
+            if (lower.includes('error') || lower.includes('failed') || lower.includes('traceback')) {
+                line.className = 'log-error';
+            } else if (lower.includes('warning') || lower.includes('warn')) {
+                line.className = 'log-warning';
+            } else if (lower.includes('completed successfully') || lower.includes('training complete') || lower.includes('saved')) {
+                line.className = 'log-success';
+            } else if (lower.includes('info')) {
+                line.className = 'log-info';
+            }
+            line.textContent = text;
+            log.appendChild(line);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function connectTrainLogs() {
+            if (trainLogSource) trainLogSource.close();
+            trainLogSource = new EventSource('/train/logs');
+
+            trainLogSource.onmessage = (e) => {
+                appendTrainLog(e.data);
+            };
+
+            trainLogSource.onerror = () => {
+                trainLogSource.close();
+                trainLogSource = null;
+                fetch('/train/state')
+                    .then(r => r.json())
+                    .then(s => setTrainProcessStatus(s.status))
+                    .catch(() => {});
+            };
+        }
+
+        async function startTraining() {
+            const fresh = document.getElementById('trainFresh').checked;
+            const log = document.getElementById('trainLog');
+            log.innerHTML = '';
+
+            setTrainProcessStatus('running');
+
+            try {
+                const res = await fetch('/train/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fresh }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    appendTrainLog('Error: ' + (data.error || 'Failed to start training'));
+                    setTrainProcessStatus('error');
+                    return;
+                }
+                connectTrainLogs();
+            } catch (err) {
+                appendTrainLog('Error: ' + err.message);
+                setTrainProcessStatus('error');
+            }
+        }
+
+        async function stopTraining() {
+            try {
+                setTrainProcessStatus('stopping');
+                await fetch('/train/stop', { method: 'POST' });
+            } catch (err) {
+                appendTrainLog('Stop error: ' + err.message);
+            }
+        }
+
+        // ============================================================
+        // Dataset Refresh
+        // ============================================================
+        let refreshLogSource = null;
+
+        function setRefreshStatus(status) {
+            const badge = document.getElementById('refreshBadge');
+            badge.className = 'refresh-status-badge refresh-' + status;
+            const labels = { idle: 'Idle', running: 'Running', complete: 'Complete', error: 'Error' };
+            badge.textContent = labels[status] || status;
+
+            const isRunning = status === 'running';
+            document.getElementById('btnRefresh').disabled = isRunning;
+            document.getElementById('btnCancel').disabled = !isRunning;
+            document.getElementById('daysBack').disabled = isRunning;
+            document.getElementById('skipBuild').disabled = isRunning;
+        }
+
+        function appendRefreshLog(text) {
+            const log = document.getElementById('refreshLog');
+            // Clear placeholder on first real line
+            const empty = log.querySelector('.refresh-log-empty');
+            if (empty) empty.remove();
+
+            const line = document.createElement('div');
+
+            if (text.includes('completed successfully') || text.includes('complete')) {
+                line.className = 'log-line-success';
+            } else if (text.includes('error') || text.includes('failed') || text.includes('cancelled')) {
+                line.className = 'log-line-error';
+            } else if (text.includes('INFO')) {
+                line.className = 'log-line-info';
+            }
+
+            line.textContent = text;
+            log.appendChild(line);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function connectRefreshLogs() {
+            if (refreshLogSource) {
+                refreshLogSource.close();
+            }
+            refreshLogSource = new EventSource('/refresh/logs');
+
+            refreshLogSource.onmessage = (e) => {
+                appendRefreshLog(e.data);
+            };
+
+            refreshLogSource.onerror = () => {
+                refreshLogSource.close();
+                refreshLogSource = null;
+                // Check final status
+                fetch('/refresh/status')
+                    .then(r => r.json())
+                    .then(s => {
+                        setRefreshStatus(s.status);
+                        if (s.status === 'complete') loadManifest();
+                    })
+                    .catch(() => {});
+            };
+        }
+
+        async function startRefresh() {
+            const daysBack = parseInt(document.getElementById('daysBack').value) || null;
+            const skipBuild = document.getElementById('skipBuild').checked;
+
+            // Clear log
+            const log = document.getElementById('refreshLog');
+            log.innerHTML = '';
+
+            setRefreshStatus('running');
+
+            try {
+                const res = await fetch('/refresh/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ days_back: daysBack, skip_build: skipBuild }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    appendRefreshLog('Error: ' + (data.error || 'Failed to start refresh'));
+                    setRefreshStatus('error');
+                    return;
+                }
+                // Connect to log stream
+                connectRefreshLogs();
+            } catch (err) {
+                appendRefreshLog('Error: ' + err.message);
+                setRefreshStatus('error');
+            }
+        }
+
+        async function cancelRefresh() {
+            try {
+                await fetch('/refresh/cancel', { method: 'POST' });
+            } catch (err) {
+                appendRefreshLog('Cancel error: ' + err.message);
+            }
+        }
+
+        function fmtNumber(n) {
+            if (n == null) return '--';
+            return n.toLocaleString();
+        }
+
+        async function loadManifest() {
+            try {
+                const res = await fetch('/refresh/manifest');
+                if (!res.ok) return;
+                const m = await res.json();
+                document.getElementById('statTotal').textContent = fmtNumber(m.total_examples);
+                document.getElementById('statCustom').textContent = fmtNumber(
+                    m.custom_examples != null ? m.custom_examples : null
+                );
+                document.getElementById('statTrain').textContent = fmtNumber(
+                    m.splits ? m.splits.train : null
+                );
+                if (m.refresh_timestamp) {
+                    const d = new Date(m.refresh_timestamp);
+                    document.getElementById('statRefresh').textContent =
+                        d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                } else {
+                    document.getElementById('statRefresh').textContent = 'Initial';
+                }
+            } catch (e) {
+                // Manifest not available yet
+            }
+        }
+
+        // ============================================================
+        // Init
+        // ============================================================
+        (async function init() {
+            // Check if there's existing state (page reload during training)
+            try {
+                const res = await fetch('/state');
+                const state = await res.json();
+                if (state.status && state.status !== 'waiting') {
+                    setStatus(state.status);
+                    if (state.config && state.config.timestamp) {
+                        startTime = state.config.timestamp;
+                        config = state.config;
+                        startElapsedTimer();
+                    }
+                }
+            } catch (e) {
+                // Dashboard not ready yet
+            }
+
+            // Load dataset manifest
+            loadManifest();
+
+            // Restore refresh state if running
+            try {
+                const res = await fetch('/refresh/status');
+                const rs = await res.json();
+                if (rs.status && rs.status !== 'idle') {
+                    setRefreshStatus(rs.status);
+                    if (rs.status === 'running') {
+                        connectRefreshLogs();
+                    }
+                }
+            } catch (e) {
+                // Not available
+            }
+
+            // Restore training process state
+            try {
+                const res = await fetch('/train/state');
+                const ts = await res.json();
+                if (ts.status && ts.status !== 'idle') {
+                    setTrainProcessStatus(ts.status);
+                    if (ts.status === 'running' || ts.status === 'stopping') {
+                        connectTrainLogs();
+                    }
+                }
+            } catch (e) {
+                // Not available
+            }
+
+            connect();
+        })();
+    </script>
+</body>
+</html>
