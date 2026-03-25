@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 6: TurboQuant — Fine-Tune MDR</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a28;
+            --text-primary: #e0e0e8;
+            --text-secondary: #888898;
+            --cyber-green: #00ff88;
+            --cyber-cyan: #00ffdd;
+            --cyber-blue: #00aaff;
+            --cyber-red: #ff4466;
+            --cyber-yellow: #ffaa00;
+            --cyber-purple: #aa66ff;
+            --border-color: #1e1e2e;
+            --accent: var(--cyber-purple);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.7;
+        }
+
+        /* Top bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .top-bar .logo { font-size: 13px; color: var(--accent); font-weight: 600; }
+        .top-bar .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+        .top-bar .nav-link:hover { color: var(--cyber-green); }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px 24px 60px;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .hero .phase-tag {
+            display: inline-block;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+            padding: 4px 12px;
+            border-radius: 3px;
+            margin-bottom: 16px;
+        }
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .hero h1 span { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Coming Soon banner */
+        .coming-soon-banner {
+            display: inline-block;
+            border: 1px solid var(--cyber-yellow);
+            background: color-mix(in srgb, var(--cyber-yellow) 8%, transparent);
+            color: var(--cyber-yellow);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            padding: 6px 16px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+        }
+
+        /* Expandable sections */
+        details {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        details[open] { border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color)); }
+        details summary {
+            padding: 16px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '\25B6';
+            font-size: 9px;
+            color: var(--accent);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+        details .content {
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 0;
+            padding-top: 16px;
+        }
+
+        /* Experiment number badge */
+        .exp-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .exp-num.baseline { background: var(--cyber-green); color: #000; }
+        .exp-num.danger { background: var(--cyber-red); color: #fff; }
+        .exp-num.warning { background: var(--cyber-yellow); color: #000; }
+        .exp-num.info { background: var(--cyber-blue); color: #fff; }
+        .exp-num.neutral { background: var(--cyber-purple); color: #fff; }
+
+        /* Code blocks */
+        .code-block {
+            position: relative;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        .code-block code {
+            font-size: 12px;
+            color: var(--cyber-green);
+            white-space: pre;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .copy-btn:hover { color: var(--cyber-green); border-color: var(--cyber-green); }
+
+        /* Subsections */
+        .sub-label {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 16px 0 6px;
+            font-weight: 600;
+        }
+        .sub-label:first-child { margin-top: 0; }
+
+        p { margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; }
+        p strong { color: var(--text-primary); }
+
+        /* Notes textarea */
+        .note-area {
+            width: 100%;
+            min-height: 60px;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 10px 12px;
+            resize: vertical;
+            margin-top: 8px;
+        }
+        .note-area::placeholder { color: #444; }
+        .note-area:focus { outline: none; border-color: var(--accent); }
+
+        /* Concept visuals */
+        .visual-box {
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .visual-box .caption {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        /* Data table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 12px;
+        }
+        .data-table th {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--accent);
+            color: var(--accent);
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .data-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        .data-table tr:hover td { color: var(--text-primary); }
+        .data-table .highlight { color: var(--cyber-green); font-weight: 600; }
+        .data-table .warn { color: var(--cyber-yellow); font-weight: 600; }
+        .data-table .dim { color: #555; }
+
+        /* KV bar chart */
+        .kv-bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: stretch;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .kv-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .kv-bar-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            width: 100px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .kv-bar-track {
+            flex: 1;
+            height: 22px;
+            background: #1a1a28;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+        .kv-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            font-size: 10px;
+            color: #000;
+            font-weight: 700;
+            transition: width 0.8s ease;
+        }
+
+        /* Memory stack */
+        .mem-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .mem-block {
+            padding: 10px 14px;
+            border-radius: 4px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mem-block .size { font-weight: 700; }
+
+        /* Checklist */
+        .checklist { list-style: none; }
+        .checklist li {
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checklist input[type="checkbox"] {
+            accent-color: var(--cyber-green);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Section header */
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 36px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-header .line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Inline link */
+        a.inline-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        a.inline-link:hover { text-decoration: underline; }
+
+        /* Responsive */
+        @media (max-width: 540px) {
+            .container { padding: 24px 16px 40px; }
+            .hero h1 { font-size: 24px; }
+            .kv-bar-label { width: 70px; font-size: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <span class="logo">&gt;_ Phase 6: TurboQuant</span>
+    <div>
+        <a href="/" class="nav-link">Home</a>
+        <a href="/learn/defender-rl" class="nav-link">&larr; Phase 5: Defender RL</a>
+        <a href="/train" class="nav-link">Start Training &rarr;</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <header class="hero">
+        <div class="coming-soon-banner">Status: Awaiting ICLR 2026 Release</div>
+        <div class="phase-tag">Phase 6 &mdash; Inference</div>
+        <h1>Turbo<span>Quant</span></h1>
+        <p class="subtitle">KV cache compression and inference optimization. Training makes the model smart &mdash; this phase makes it fast.</p>
+    </header>
+
+    <!-- 1. Why Inference Optimization? -->
+    <details open>
+        <summary>
+            <span class="exp-num neutral">1</span>
+            Why Inference Optimization?
+        </summary>
+        <div class="content">
+            <p>Training makes the model smart. <strong>Inference makes it fast.</strong> Once you've trained Foundation-Sec-8B and your game adapters from Phases 3-5, you need to serve them efficiently to real users and agents.</p>
+            <p>The KV cache is the <strong>memory bottleneck</strong> for long-context inference. Every token your model has ever seen in the current conversation must be stored in memory so the model can attend to it. For security workloads &mdash; analyzing Splunk logs, reviewing code, processing TARS memory &mdash; context windows get long fast.</p>
+            <p>Your DGX Spark has <strong>128GB unified memory</strong>. That needs to fit: model weights + KV cache + activations + OS overhead. The KV cache is the variable that grows with every token generated, and it's the one we can compress.</p>
+        </div>
+    </details>
+
+    <!-- 2. The KV Cache Explained -->
+    <details>
+        <summary>
+            <span class="exp-num info">2</span>
+            The KV Cache Explained
+        </summary>
+        <div class="content">
+            <div class="sub-label">What it stores</div>
+            <p>During autoregressive generation, the model produces one token at a time. For each new token, it needs to compute attention against <strong>every previous token</strong>. Without caching, this means re-running the full sequence through every layer on every step &mdash; quadratic cost.</p>
+            <p>The KV cache stores the <strong>Key and Value projection vectors</strong> from every previous token in every layer. On the next step, the model only computes Q/K/V for the new token, then looks up the cached K and V vectors for all prior tokens. This makes generation linear instead of quadratic.</p>
+
+            <div class="sub-label">How big is it?</div>
+            <p>KV cache size = <strong>tokens x layers x heads x head_dim x 2 x bytes_per_param</strong></p>
+            <p>The "x 2" is for both K and V. Here's what that looks like for Foundation-Sec-8B (32 layers, 8 KV heads, head_dim 128) in BF16:</p>
+
+            <div class="visual-box">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Sequence Length</th>
+                            <th>Tokens</th>
+                            <th>KV Cache (BF16)</th>
+                            <th>Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Short chat</td>
+                            <td>512</td>
+                            <td class="highlight">64 MB</td>
+                            <td class="dim">Negligible</td>
+                        </tr>
+                        <tr>
+                            <td>Code review</td>
+                            <td>4,096</td>
+                            <td class="highlight">512 MB</td>
+                            <td>Noticeable</td>
+                        </tr>
+                        <tr>
+                            <td>Full context</td>
+                            <td>8,192</td>
+                            <td class="warn">1 GB</td>
+                            <td>Significant</td>
+                        </tr>
+                        <tr>
+                            <td>Qwen3.5 max</td>
+                            <td>262,144</td>
+                            <td style="color:var(--cyber-red);font-weight:600">32 GB</td>
+                            <td style="color:var(--cyber-red)">Enormous</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="caption">KV cache per session. Multiply by concurrent users for total memory pressure.</div>
+            </div>
+
+            <p>At 8,192 tokens on Foundation-Sec-8B, the KV cache alone uses <strong>~1 GB per session</strong>. Run 10 concurrent sessions and that's 10 GB just for the cache. On a long-context model like Qwen3.5 at max context, it's <strong>32 GB</strong> for a single session &mdash; that's a quarter of your total memory.</p>
+        </div>
+    </details>
+
+    <!-- 3. Quantization Fundamentals -->
+    <details>
+        <summary>
+            <span class="exp-num baseline">3</span>
+            Quantization Fundamentals
+        </summary>
+        <div class="content">
+            <div class="sub-label">Precision levels</div>
+            <p>Every number in a neural network is stored at some precision. Lower precision = less memory = faster math, but potentially less accuracy.</p>
+
+            <div class="visual-box">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Format</th>
+                            <th>Bits</th>
+                            <th>Bytes/Value</th>
+                            <th>Compression</th>
+                            <th>Quality Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>FP32</td>
+                            <td>32</td>
+                            <td>4</td>
+                            <td class="dim">1x (baseline)</td>
+                            <td class="highlight">Full precision</td>
+                        </tr>
+                        <tr>
+                            <td>FP16 / BF16</td>
+                            <td>16</td>
+                            <td>2</td>
+                            <td class="highlight">2x</td>
+                            <td class="highlight">Minimal loss</td>
+                        </tr>
+                        <tr>
+                            <td>INT8</td>
+                            <td>8</td>
+                            <td>1</td>
+                            <td class="highlight">4x</td>
+                            <td class="warn">Slight loss</td>
+                        </tr>
+                        <tr>
+                            <td>INT4</td>
+                            <td>4</td>
+                            <td>0.5</td>
+                            <td class="highlight">8x</td>
+                            <td style="color:var(--cyber-red)">Noticeable for weights</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="caption">Lower precision = smaller + faster, but may lose information. The sweet spot depends on what you're quantizing.</div>
+            </div>
+
+            <div class="sub-label">Weight quantization vs KV cache quantization</div>
+            <p><strong>Weight quantization</strong> is well-established. You've seen it: GGUF Q4_K_M, GPTQ, AWQ. These compress the model's learned parameters (weights) to 4-8 bits. The weights are static &mdash; they don't change during inference &mdash; so you can calibrate carefully.</p>
+            <p><strong>KV cache quantization</strong> is newer and different. The cache is <strong>dynamic</strong> &mdash; it grows with every token. You can't calibrate it ahead of time because the values depend on the input. The challenge is compressing on-the-fly without losing the information the model needs for accurate attention.</p>
+            <p>Think of it this way: weight quantization is like compressing a JPEG once. KV cache quantization is like compressing a live video stream &mdash; you need it to be fast, adaptive, and reversible enough that the model can still "see" clearly.</p>
+        </div>
+    </details>
+
+    <!-- 4. TurboQuant Concept -->
+    <details>
+        <summary>
+            <span class="exp-num neutral">4</span>
+            TurboQuant Concept
+        </summary>
+        <div class="content">
+            <div class="sub-label">The breakthrough</div>
+            <p>TurboQuant compresses the KV cache to <strong>3-4 bits</strong> with zero accuracy loss and <strong>zero retraining</strong>. It's a drop-in optimization that works on any transformer model at inference time.</p>
+            <p>Paper: <a class="inline-link" href="https://arxiv.org/abs/2504.19874" target="_blank">arxiv.org/abs/2504.19874</a></p>
+
+            <div class="sub-label">Expected impact for your setup</div>
+
+            <div class="visual-box">
+                <div class="kv-bar-chart">
+                    <div class="kv-bar-row">
+                        <div class="kv-bar-label">BF16 (now)</div>
+                        <div class="kv-bar-track">
+                            <div class="kv-bar-fill" style="width:100%;background:var(--cyber-yellow)">1 GB</div>
+                        </div>
+                    </div>
+                    <div class="kv-bar-row">
+                        <div class="kv-bar-label">INT8</div>
+                        <div class="kv-bar-track">
+                            <div class="kv-bar-fill" style="width:50%;background:var(--cyber-blue)">512 MB</div>
+                        </div>
+                    </div>
+                    <div class="kv-bar-row">
+                        <div class="kv-bar-label">TurboQuant 4b</div>
+                        <div class="kv-bar-track">
+                            <div class="kv-bar-fill" style="width:25%;background:var(--cyber-green)">256 MB</div>
+                        </div>
+                    </div>
+                    <div class="kv-bar-row">
+                        <div class="kv-bar-label">TurboQuant 3b</div>
+                        <div class="kv-bar-track">
+                            <div class="kv-bar-fill" style="width:19%;background:var(--cyber-purple);color:#fff">~170 MB</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="caption">KV cache per session at 8,192 tokens on Foundation-Sec-8B. TurboQuant 4-bit = ~4x reduction from BF16.</div>
+            </div>
+
+            <p><strong>6x reduction</strong> in KV cache memory &mdash; from ~1 GB to ~170 MB per session at 8K context.</p>
+            <p><strong>8x speedup</strong> in attention logit computation vs FP32 &mdash; fewer bits to multiply and accumulate.</p>
+            <p><strong>More concurrent sessions</strong> in 128GB &mdash; where you could serve ~10 long-context sessions before, you could serve 40-60.</p>
+            <p><strong>Long-context workloads</strong> (TARS memory, Splunk log analysis) become dramatically faster and cheaper. A 262K context Qwen3.5 session that needed 32 GB for the KV cache could drop to ~5 GB.</p>
+        </div>
+    </details>
+
+    <!-- 5. Your Current Inference Stack -->
+    <details>
+        <summary>
+            <span class="exp-num info">5</span>
+            Your Current Inference Stack
+        </summary>
+        <div class="content">
+            <div class="sub-label">What you have now</div>
+            <p>vLLM serving two models on the DGX Spark:</p>
+
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># Foundation-Sec-8B on port 8080
+export CUDA_VISIBLE_DEVICES=0
+python -m vllm.entrypoints.openai.api_server \
+    --model /path/to/Foundation-Sec-8B-merged \
+    --port 8080 \
+    --gpu-memory-utilization 0.85 \
+    --dtype bfloat16 \
+    --max-model-len 8192</code>
+            </div>
+
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># Qwen3.5-9B on port 8081
+export CUDA_VISIBLE_DEVICES=0
+python -m vllm.entrypoints.openai.api_server \
+    --model /path/to/Qwen3.5-9B \
+    --port 8081 \
+    --gpu-memory-utilization 0.85 \
+    --dtype bfloat16 \
+    --max-model-len 32768</code>
+            </div>
+
+            <div class="sub-label">Why gpu-memory-utilization=0.85</div>
+            <p>This is critical on the DGX Spark. The NVRM driver <strong>deadlocks on OOM</strong> &mdash; if a CUDA allocation fails, the NVIDIA driver holds a GPU semaphore and blocks nvidia-modeset (your display), freezing the entire system. The Linux OOM killer cannot help because the deadlock is in a kernel module.</p>
+            <p>Setting <code style="color:var(--cyber-green)">gpu-memory-utilization=0.85</code> tells vLLM to cap its memory pool at 85% of GPU memory. This gives you a clean Python OOM error instead of a system freeze if you exceed the budget.</p>
+
+            <div class="sub-label">Memory breakdown</div>
+            <div class="visual-box">
+                <div class="mem-stack">
+                    <div class="mem-block" style="background:var(--cyber-purple)">
+                        <span>Model weights (BF16)</span>
+                        <span class="size">~16 GB</span>
+                    </div>
+                    <div class="mem-block" style="background:var(--cyber-blue)">
+                        <span>KV cache pool</span>
+                        <span class="size">~70 GB</span>
+                    </div>
+                    <div class="mem-block" style="background:color-mix(in srgb, var(--cyber-yellow) 80%, #000)">
+                        <span>Activations + overhead</span>
+                        <span class="size">~5 GB</span>
+                    </div>
+                    <div class="mem-block" style="background:#333;color:var(--text-secondary)">
+                        <span>Reserved (0.85 cap + OS)</span>
+                        <span class="size">~37 GB</span>
+                    </div>
+                </div>
+                <div class="caption">Approximate memory layout when serving Foundation-Sec-8B on DGX Spark (128GB unified).</div>
+            </div>
+        </div>
+    </details>
+
+    <!-- 6. When It Arrives -->
+    <details>
+        <summary>
+            <span class="exp-num warning">6</span>
+            When It Arrives
+        </summary>
+        <div class="content">
+            <div class="sub-label">Current status</div>
+            <p>TurboQuant is <strong>presenting at ICLR 2026</strong>. The paper is public, but production-ready implementations are not yet merged into serving frameworks.</p>
+
+            <div class="sub-label">What to watch for</div>
+            <p>Watch for a <strong>vLLM pull request</strong> adding TurboQuant support. When it merges, the change will likely be a single flag:</p>
+
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># Expected future usage (not yet available)
+python -m vllm.entrypoints.openai.api_server \
+    --model /path/to/Foundation-Sec-8B-merged \
+    --port 8080 \
+    --gpu-memory-utilization 0.85 \
+    --dtype bfloat16 \
+    --max-model-len 8192 \
+    --kv-cache-dtype turboquant-4bit</code>
+            </div>
+
+            <p>This is a <strong>drop-in upgrade</strong>. No retraining needed. No model changes. No adapter modifications. You just add the flag and your KV cache shrinks by 4-6x.</p>
+
+            <div class="sub-label">Why this matters for security workloads</div>
+            <p>Security analysis is inherently <strong>long-context</strong>. Analyzing a 500-line Splunk query result, reviewing a full code file for vulnerabilities, maintaining TARS agent memory across a campaign &mdash; these all push context windows to their limits. TurboQuant directly addresses the memory constraint that limits how much context you can process per session.</p>
+        </div>
+    </details>
+
+    <!-- 7. What to Do Now -->
+    <details>
+        <summary>
+            <span class="exp-num baseline">7</span>
+            What to Do Now
+        </summary>
+        <div class="content">
+            <div class="sub-label">Prepare your baseline</div>
+            <p>You can prepare now so that when TurboQuant lands, you can measure the improvement precisely.</p>
+
+            <p><strong>1. Understand your current memory usage.</strong> Run this while serving a model:</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>nvidia-smi --query-gpu=memory.used,memory.total,memory.free \
+    --format=csv -l 5</code>
+            </div>
+
+            <p><strong>2. Know your KV cache budget.</strong> The formula:</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># Available for KV cache:
+# 128 GB * 0.85 = 108.8 GB (memory cap)
+# 108.8 GB - 16 GB (model weights) - 5 GB (overhead) = ~87 GB
+#
+# At BF16, 8K context per session:
+#   87 GB / 1 GB per session = ~87 concurrent sessions
+#
+# With TurboQuant 4-bit:
+#   87 GB / 0.25 GB per session = ~348 concurrent sessions</code>
+            </div>
+
+            <p><strong>3. Keep vLLM up to date.</strong> When the feature lands, you want to be on a version that includes it:</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>pip install --upgrade vllm</code>
+            </div>
+
+            <div class="sub-label">Record your current baselines</div>
+            <textarea class="note-area" data-note="baselines" placeholder="Record your current memory usage during serving:&#10;- nvidia-smi memory used with Foundation-Sec-8B loaded:&#10;- nvidia-smi memory used with Qwen3.5 loaded:&#10;- Max concurrent sessions before OOM:&#10;- vLLM version:"></textarea>
+        </div>
+    </details>
+
+    <!-- COMPLETION -->
+    <div class="section-header">
+        <span>Completion</span>
+        <span class="line"></span>
+    </div>
+
+    <details open>
+        <summary>Completion Checklist</summary>
+        <div class="content">
+            <p>Check off each item as you understand it. This phase is about <strong>preparedness</strong> &mdash; when TurboQuant drops, you'll be ready to apply it immediately.</p>
+            <ul class="checklist">
+                <li><input type="checkbox" id="g1"><label for="g1">I understand what the KV cache stores and why it's expensive</label></li>
+                <li><input type="checkbox" id="g2"><label for="g2">I can explain quantization precision levels (FP32 &rarr; INT4)</label></li>
+                <li><input type="checkbox" id="g3"><label for="g3">I know the difference between weight quantization and KV cache quantization</label></li>
+                <li><input type="checkbox" id="g4"><label for="g4">I understand my current inference memory budget</label></li>
+                <li><input type="checkbox" id="g5"><label for="g5">I'm ready to apply TurboQuant when it's released</label></li>
+            </ul>
+            <p style="margin-top:16px">All checked? Head back to <a href="/" style="color:var(--cyber-green)">the dashboard</a> and <a href="/train" style="color:var(--cyber-green)">start training &rarr;</a></p>
+        </div>
+    </details>
+
+</div>
+
+<script>
+// Copy button
+function copyCode(btn) {
+    const code = btn.parentElement.querySelector('code');
+    navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    }).catch(() => {
+        // Fallback for non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = code.textContent;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+}
+
+// Notes persistence
+document.querySelectorAll('.note-area').forEach(el => {
+    const key = 'turboquant_note_' + (el.dataset.experiment || el.dataset.note);
+    el.value = localStorage.getItem(key) || '';
+    el.addEventListener('input', () => localStorage.setItem(key, el.value));
+});
+
+// Checklist persistence
+document.querySelectorAll('.checklist input[type="checkbox"]').forEach(el => {
+    const key = 'turboquant_check_' + el.id;
+    el.checked = localStorage.getItem(key) === 'true';
+    el.addEventListener('change', () => localStorage.setItem(key, el.checked));
+});
+</script>
+
+</body>
+</html>

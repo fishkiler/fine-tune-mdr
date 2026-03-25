@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 2: Foundation-Sec-8B SFT &mdash; Fine-Tune MDR</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a28;
+            --text-primary: #e0e0e8;
+            --text-secondary: #888898;
+            --cyber-green: #00ff88;
+            --cyber-cyan: #00ffdd;
+            --cyber-blue: #00aaff;
+            --cyber-red: #ff4466;
+            --cyber-yellow: #ffaa00;
+            --cyber-purple: #aa66ff;
+            --border-color: #1e1e2e;
+            --accent: var(--cyber-green);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.7;
+        }
+
+        /* Top bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .top-bar .logo { font-size: 13px; color: var(--accent); font-weight: 600; }
+        .top-bar .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+        .top-bar .nav-link:hover { color: var(--cyber-green); }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px 24px 60px;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .hero .phase-tag {
+            display: inline-block;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+            padding: 4px 12px;
+            border-radius: 3px;
+            margin-bottom: 16px;
+        }
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .hero h1 span { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Expandable sections */
+        details {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        details[open] { border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color)); }
+        details summary {
+            padding: 16px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '\25B6';
+            font-size: 9px;
+            color: var(--accent);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+        details .content {
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 0;
+            padding-top: 16px;
+        }
+
+        /* Section number badge */
+        .exp-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .exp-num.baseline { background: var(--cyber-green); color: #000; }
+        .exp-num.danger { background: var(--cyber-red); color: #fff; }
+        .exp-num.warning { background: var(--cyber-yellow); color: #000; }
+        .exp-num.info { background: var(--cyber-blue); color: #fff; }
+        .exp-num.neutral { background: var(--cyber-purple); color: #fff; }
+
+        /* Code blocks */
+        .code-block {
+            position: relative;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        .code-block code {
+            font-size: 12px;
+            color: var(--cyber-green);
+            white-space: pre;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .copy-btn:hover { color: var(--cyber-green); border-color: var(--cyber-green); }
+
+        /* Subsections */
+        .sub-label {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 16px 0 6px;
+            font-weight: 600;
+        }
+        .sub-label:first-child { margin-top: 0; }
+
+        p { margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; }
+        p strong { color: var(--text-primary); }
+
+        /* Notes textarea */
+        .note-area {
+            width: 100%;
+            min-height: 60px;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 10px 12px;
+            resize: vertical;
+            margin-top: 8px;
+        }
+        .note-area::placeholder { color: #444; }
+        .note-area:focus { outline: none; border-color: var(--accent); }
+
+        /* Concept visuals */
+        .visual-box {
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .visual-box .caption {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        /* LoRA decomposition visual */
+        .lora-decomp {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 10px 0;
+        }
+        .matrix-box {
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px 16px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .matrix-box .dim {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            font-weight: 400;
+        }
+        .matrix-box.frozen {
+            border-color: #444;
+            color: var(--text-secondary);
+            background: #0a0a10;
+        }
+        .matrix-box.trainable {
+            border-color: var(--cyber-green);
+            color: var(--cyber-green);
+            background: rgba(0, 255, 136, 0.05);
+        }
+        .matrix-box.result {
+            border-color: var(--cyber-cyan);
+            color: var(--cyber-cyan);
+        }
+        .lora-op {
+            font-size: 18px;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+        .lora-highlight {
+            display: inline-block;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 3px;
+            padding: 2px 8px;
+            font-size: 12px;
+            color: var(--cyber-green);
+            font-weight: 600;
+        }
+
+        /* Pipeline flow */
+        .pipeline-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            align-items: center;
+            margin: 12px 0;
+        }
+        .pipeline-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 460px;
+        }
+        .pipeline-step .step-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .pipeline-step .step-desc {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        .pipeline-arrow {
+            font-size: 16px;
+            color: var(--cyber-green);
+            padding: 4px 0;
+        }
+
+        /* Domain weight table */
+        .weight-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 12px;
+        }
+        .weight-table th {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 2px solid var(--border-color);
+            color: var(--accent);
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .weight-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        .weight-table td:first-child { color: var(--text-primary); font-weight: 600; }
+        .weight-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .weight-bar {
+            display: inline-block;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--cyber-green);
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        /* Checklist */
+        .checklist { list-style: none; }
+        .checklist li {
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checklist input[type="checkbox"] {
+            accent-color: var(--cyber-green);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Section header */
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 36px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-header .line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Teacher forcing visual */
+        .tf-demo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 10px 0;
+        }
+        .tf-token {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .tf-token.system { background: rgba(0, 170, 255, 0.15); color: var(--cyber-blue); border: 1px solid rgba(0, 170, 255, 0.3); }
+        .tf-token.user { background: rgba(170, 102, 255, 0.15); color: var(--cyber-purple); border: 1px solid rgba(170, 102, 255, 0.3); }
+        .tf-token.assistant { background: rgba(0, 255, 136, 0.15); color: var(--cyber-green); border: 1px solid rgba(0, 255, 136, 0.3); }
+        .tf-token.loss { background: rgba(255, 68, 102, 0.15); color: var(--cyber-red); border: 1px solid rgba(255, 68, 102, 0.3); }
+        .tf-arrow { color: var(--text-secondary); font-size: 14px; }
+
+        /* Monitor cards */
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 12px 0;
+        }
+        .monitor-card {
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px;
+        }
+        .monitor-card .mc-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .monitor-card .mc-good {
+            font-size: 11px;
+            color: var(--cyber-green);
+            margin-bottom: 2px;
+        }
+        .monitor-card .mc-bad {
+            font-size: 11px;
+            color: var(--cyber-red);
+        }
+
+        /* Responsive */
+        @media (max-width: 540px) {
+            .container { padding: 24px 16px 40px; }
+            .hero h1 { font-size: 24px; }
+            .lora-decomp { gap: 8px; }
+            .monitor-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <span class="logo">&gt;_ Phase 2: Foundation-Sec SFT</span>
+    <div>
+        <a href="/" class="nav-link">Home</a>
+        <a href="/learn/autoresearch" class="nav-link">&larr; Phase 1: autoresearch</a>
+        <a href="/learn/fast-iteration" class="nav-link">Phase 3: Fast Iteration &rarr;</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <header class="hero">
+        <div class="phase-tag">Phase 2 &mdash; Production Training</div>
+        <h1>Foundation-Sec-8B <span>SFT</span></h1>
+        <p class="subtitle">Supervised fine-tuning takes a pre-trained language model and teaches it cybersecurity. LoRA adapters, domain-weighted data, and a full training pipeline on the DGX Spark.</p>
+    </header>
+
+    <!-- 1. WHY SFT -->
+    <details open>
+        <summary>
+            <span class="exp-num baseline">1</span>
+            Why Supervised Fine-Tuning?
+        </summary>
+        <div class="content">
+            <p>Foundation-Sec-8B already <strong>knows language</strong> &mdash; it can complete sentences, follow grammar, and reason about text. But it doesn't know how to write Sigma rules, analyze attack logs, or generate SIEM queries. SFT bridges that gap.</p>
+            <p>Supervised fine-tuning feeds the model <strong>thousands of (prompt, response) pairs</strong> and adjusts its weights so it produces responses like the ones in your dataset. It's the same mechanism as pre-training, but on curated domain-specific data.</p>
+
+            <div class="sub-label">Teacher Forcing</div>
+            <p>During training, the model sees the correct answer at every step &mdash; this is called <strong>teacher forcing</strong>. Instead of generating freely (where errors compound), we feed the ground-truth tokens as input and ask "given this correct prefix, predict the next token." This makes training stable and fast.</p>
+
+            <div class="sub-label">Loss on Assistant Tokens Only</div>
+            <p>In a ChatML conversation, we only compute loss on the <strong>assistant's response tokens</strong>. The system prompt and user message are context &mdash; we don't penalize the model for "predicting" those. This focuses all gradient signal on the behavior we want to teach.</p>
+
+            <div class="visual-box">
+                <div class="tf-demo">
+                    <span class="tf-token system">&lt;|system|&gt;</span>
+                    <span class="tf-arrow">&rarr;</span>
+                    <span class="tf-token user">&lt;|user|&gt; Analyze this log...</span>
+                    <span class="tf-arrow">&rarr;</span>
+                    <span class="tf-token assistant">&lt;|assistant|&gt; The log shows...</span>
+                </div>
+                <div style="margin-top:12px;">
+                    <div class="tf-demo">
+                        <span class="tf-token system" style="opacity:0.4">no loss</span>
+                        <span class="tf-arrow">&rarr;</span>
+                        <span class="tf-token user" style="opacity:0.4">no loss</span>
+                        <span class="tf-arrow">&rarr;</span>
+                        <span class="tf-token loss">loss computed here</span>
+                    </div>
+                </div>
+                <div class="caption">Loss is only computed on assistant tokens. System and user tokens are masked &mdash; they provide context but don't contribute to gradients.</div>
+            </div>
+
+            <p><strong>Key insight:</strong> SFT doesn't teach the model new knowledge from scratch. It teaches the model to <strong>surface and organize</strong> what it already knows in a cybersecurity-specific way. The pre-training gave it the vocabulary; SFT teaches it the job.</p>
+        </div>
+    </details>
+
+    <!-- 2. PRE-FLIGHT CHECKLIST -->
+    <details>
+        <summary>
+            <span class="exp-num warning">2</span>
+            Pre-Flight Checklist
+        </summary>
+        <div class="content">
+            <p>Before starting a training run, make sure nothing else is competing for GPU memory and all environment variables are set.</p>
+
+            <div class="sub-label">Stop Competing Processes</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>sudo systemctl stop ollama
+sudo systemctl stop vllm
+# Verify nothing else is using the GPU:
+nvidia-smi</code>
+            </div>
+
+            <div class="sub-label">Set Environment Variables</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>export TORCH_CUDA_ARCH_LIST="12.1"
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True</code>
+            </div>
+
+            <div class="sub-label">Verify GPU</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>nvidia-smi
+# Should show: GB10 with ~128GB memory, no other processes</code>
+            </div>
+
+            <div class="sub-label">Start the Dashboard</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>cd ~/Documents/dgx-code-bank/fine-tune-mdr
+python -m dashboard.app &amp;</code>
+            </div>
+
+            <div class="sub-label">Launch Training</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>cd ~/Documents/dgx-code-bank/fine-tune-mdr
+bash train.sh</code>
+            </div>
+
+            <p><strong>Why train.sh?</strong> The wrapper runs training inside a systemd cgroup with <strong>MemoryMax=110G</strong> and no swap. This prevents the NVRM driver deadlock that occurs when the GPU OOMs &mdash; instead of freezing the system, you get a clean Python error.</p>
+        </div>
+    </details>
+
+    <!-- 3. LORA EXPLAINED -->
+    <details>
+        <summary>
+            <span class="exp-num info">3</span>
+            LoRA Explained
+        </summary>
+        <div class="content">
+            <p><strong>Low-Rank Adaptation (LoRA)</strong> is a technique that makes fine-tuning feasible on consumer hardware. Instead of updating all 8 billion parameters, we freeze the original weights and inject small trainable matrices alongside them.</p>
+
+            <div class="sub-label">The Core Idea</div>
+            <p>A pre-trained weight matrix <strong>W</strong> has dimensions d&times;d (e.g., 4096&times;4096 = ~16M parameters). LoRA decomposes the update into two small matrices: <strong>B</strong> (d&times;r) and <strong>A</strong> (r&times;d), where r is the <strong>rank</strong> &mdash; typically 8-64.</p>
+            <p>During fine-tuning, the effective weight becomes <strong>W' = W&#8320; + B&times;A</strong>. Only B and A are trained. W&#8320; stays frozen.</p>
+
+            <div class="visual-box">
+                <div class="lora-decomp">
+                    <div class="matrix-box result">
+                        W'
+                        <div class="dim">4096 &times; 4096</div>
+                    </div>
+                    <span class="lora-op">=</span>
+                    <div class="matrix-box frozen">
+                        W&#8320;
+                        <div class="dim">4096 &times; 4096 (frozen)</div>
+                    </div>
+                    <span class="lora-op">+</span>
+                    <div class="matrix-box trainable">
+                        B
+                        <div class="dim">4096 &times; 16</div>
+                    </div>
+                    <span class="lora-op">&times;</span>
+                    <div class="matrix-box trainable">
+                        A
+                        <div class="dim">16 &times; 4096</div>
+                    </div>
+                </div>
+                <div style="margin-top:12px;">
+                    <span class="lora-highlight">r = 16 &laquo; d = 4096</span>
+                </div>
+                <div class="caption">W&#8320; has 16.7M params (frozen). B&times;A has only 131K params (trainable). That's <strong>0.8%</strong> of the original &mdash; roughly 100x fewer parameters.</div>
+            </div>
+
+            <div class="sub-label">Key Hyperparameters</div>
+            <p><strong>r (rank)</strong> = 16 &mdash; Controls the expressiveness of the adaptation. Higher rank = more capacity but more parameters. 16 is a good balance for domain adaptation.</p>
+            <p><strong>alpha</strong> = 32 &mdash; Scaling factor applied as alpha/r. With alpha=32 and r=16, the LoRA update is scaled by 2x. Think of it as the "learning intensity" for the adapter.</p>
+            <p><strong>target_modules</strong> = q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj &mdash; We apply LoRA to all attention projections (Q/K/V/O) and the MLP layers (gate/up/down). This covers the full transformer block, giving LoRA the ability to modify both what the model attends to and how it transforms information.</p>
+
+            <div class="sub-label">Why Not Full Fine-Tuning?</div>
+            <p>Full fine-tuning of 8B parameters requires <strong>~64GB</strong> just for optimizer states (Adam stores 2 copies). LoRA trains ~42M parameters instead &mdash; optimizer states fit in <strong>~500MB</strong>. On the DGX Spark with 128GB unified memory, this is the difference between a comfortable fit and running out of memory.</p>
+        </div>
+    </details>
+
+    <!-- 4. DATA PIPELINE -->
+    <details>
+        <summary>
+            <span class="exp-num neutral">4</span>
+            Data Pipeline
+        </summary>
+        <div class="content">
+            <p>Training data flows through a multi-stage pipeline. Each step adds quality guarantees so the model only trains on verified, well-formatted examples.</p>
+
+            <div class="visual-box" style="text-align:center">
+                <div class="pipeline-flow">
+                    <div class="pipeline-step">
+                        <div class="step-name">MDR Log Simulator</div>
+                        <div class="step-desc">Generates attack scenarios, SIEM queries, Sigma rules from 192.168.1.67:6971</div>
+                    </div>
+                    <div class="pipeline-arrow">&darr;</div>
+                    <div class="pipeline-step">
+                        <div class="step-name">ingest_data.py</div>
+                        <div class="step-desc">Incremental ingestion with content hashing for dedup. Reads JSONL, Arrow, pentestds.</div>
+                    </div>
+                    <div class="pipeline-arrow">&darr;</div>
+                    <div class="pipeline-step">
+                        <div class="step-name">SQLite Database</div>
+                        <div class="step-desc">Schema v5 &mdash; 380K records with STIX relationship graph layer</div>
+                    </div>
+                    <div class="pipeline-arrow">&darr;</div>
+                    <div class="pipeline-step">
+                        <div class="step-name">validate_data.py</div>
+                        <div class="step-desc">Rule-based format validation: CVE/MITRE/code review/log/SIEM/Sigma checks</div>
+                    </div>
+                    <div class="pipeline-arrow">&darr;</div>
+                    <div class="pipeline-step">
+                        <div class="step-name">review_data.py (Claude Sonnet)</div>
+                        <div class="step-desc">LLM quality scoring: 5 dimensions, 1-5 scale. Threshold: quality &ge; 3.5</div>
+                    </div>
+                    <div class="pipeline-arrow">&darr;</div>
+                    <div class="pipeline-step">
+                        <div class="step-name">export_training_data.py</div>
+                        <div class="step-desc">Quality-filtered export with domain weights. Stamps exported_at, writes history.</div>
+                    </div>
+                    <div class="pipeline-arrow">&darr;</div>
+                    <div class="pipeline-step">
+                        <div class="step-name">ChatML JSONL</div>
+                        <div class="step-desc">Final format: {messages: [{role, content}, ...]} ready for SFTTrainer</div>
+                    </div>
+                    <div class="pipeline-arrow">&darr;</div>
+                    <div class="pipeline-step" style="border-color: var(--cyber-green);">
+                        <div class="step-name" style="color: var(--cyber-green);">SFTTrainer</div>
+                        <div class="step-desc">Tokenization, packing, LoRA training with domain-balanced batches</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-label">Why So Many Steps?</div>
+            <p><strong>Garbage in, garbage out</strong> applies double for fine-tuning. A single malformed Sigma rule in the training set teaches the model to generate malformed Sigma rules. The pipeline catches format errors (validate), quality issues (review), and ensures the right domain balance (export with weights).</p>
+            <p>The <strong>--new-only</strong> flag on export means you can incrementally add data without re-exporting everything. Each record gets an <strong>exported_at</strong> timestamp so you know exactly what the model was trained on.</p>
+        </div>
+    </details>
+
+    <!-- 5. DOMAIN WEIGHT TUNING -->
+    <details>
+        <summary>
+            <span class="exp-num danger">5</span>
+            Domain Weight Tuning
+        </summary>
+        <div class="content">
+            <p>The training dataset spans multiple cybersecurity domains with <strong>wildly different sizes</strong>. Without balancing, the model would see 618K CVE records for every 348 code reviews &mdash; it would become an expert at CVE descriptions and terrible at everything else.</p>
+
+            <div class="sub-label">Domain Weights</div>
+            <table class="weight-table">
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th>Weight</th>
+                        <th>Records</th>
+                        <th>Rationale</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>cve</td>
+                        <td><span class="weight-bar" style="width:4px"></span>0.08</td>
+                        <td>~618,000</td>
+                        <td>Downsample heavily &mdash; most are repetitive boilerplate</td>
+                    </tr>
+                    <tr>
+                        <td>mitre_attack</td>
+                        <td><span class="weight-bar" style="width:50px"></span>10.0</td>
+                        <td>~1,317</td>
+                        <td>Oversample 10x &mdash; high signal, ATT&CK framework critical</td>
+                    </tr>
+                    <tr>
+                        <td>secure_code_review</td>
+                        <td><span class="weight-bar" style="width:90px"></span>30.0</td>
+                        <td>~348</td>
+                        <td>Oversample 30x &mdash; extremely high signal, very few examples</td>
+                    </tr>
+                    <tr>
+                        <td>siem_queries</td>
+                        <td><span class="weight-bar" style="width:40px"></span>8.0</td>
+                        <td>~700</td>
+                        <td>SPL/KQL generation critical for Splunk/Sentinel ops</td>
+                    </tr>
+                    <tr>
+                        <td>sigma_rules</td>
+                        <td><span class="weight-bar" style="width:50px"></span>10.0</td>
+                        <td>~700</td>
+                        <td>YAML detection rules must be syntactically perfect</td>
+                    </tr>
+                    <tr>
+                        <td>log_analysis</td>
+                        <td><span class="weight-bar" style="width:25px"></span>5.0</td>
+                        <td>~1,600</td>
+                        <td>Direct MDR relevance &mdash; analyzing real attack logs</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="sub-label">How Weights Work</div>
+            <p>During export, each domain's records are <strong>sampled proportionally to their weight</strong>. A weight of 30.0 means a record from that domain is 30x more likely to appear in the final training set compared to weight 1.0. A weight of 0.08 means aggressive downsampling &mdash; only ~8% of CVE records make it through.</p>
+            <p>The result: instead of 99% CVEs, the training set has a <strong>balanced mix</strong> where the model sees code reviews and Sigma rules almost as often as CVE descriptions, despite having 1,700x fewer source records.</p>
+
+            <p><strong>Key insight:</strong> Domain weighting is one of the highest-leverage decisions in the entire pipeline. Getting these ratios wrong produces a model that's great at one thing and useless at five others.</p>
+
+            <div class="sub-label">Notes</div>
+            <textarea class="note-area" data-section="weights" placeholder="Your thoughts on domain balance..."></textarea>
+        </div>
+    </details>
+
+    <!-- 6. TRAINING RUN WALKTHROUGH -->
+    <div class="section-header">
+        <span>Training</span>
+        <span class="line"></span>
+    </div>
+
+    <details>
+        <summary>
+            <span class="exp-num baseline">6</span>
+            Training Run Walkthrough
+        </summary>
+        <div class="content">
+            <div class="sub-label">Launch Commands</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># Default: resumes from latest checkpoint
+python train_native.py
+
+# Explicit config file
+python train_native.py --config config.yaml
+
+# Fresh start: ignore all checkpoints
+python train_native.py --fresh</code>
+            </div>
+
+            <div class="sub-label">What Happens During Training</div>
+            <p><strong>1. Tokenization</strong> &mdash; ChatML conversations are tokenized using the model's tokenizer. Each message gets wrapped with special tokens (&lt;|system|&gt;, &lt;|user|&gt;, &lt;|assistant|&gt;). Labels are masked for non-assistant tokens.</p>
+            <p><strong>2. Packing</strong> &mdash; Multiple short examples are concatenated into a single sequence up to max_length (1024 tokens). This eliminates ~38% padding waste and is the <strong>biggest single optimization</strong> for throughput on the GB10.</p>
+            <p><strong>3. Gradient Updates</strong> &mdash; Each batch computes the cross-entropy loss on assistant tokens, backpropagates through the LoRA matrices (B and A), and applies the Adam optimizer. The base model weights stay frozen throughout.</p>
+            <p><strong>4. Checkpoint Saving</strong> &mdash; Every N steps, the trainer saves LoRA adapter weights (not the full model). Checkpoints are ~170MB each. HF Trainer evaluates <strong>before</strong> saving &mdash; if you kill during eval, that checkpoint is lost.</p>
+
+            <div class="sub-label">Key Config Values</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># From config.yaml — the important dials
+per_device_train_batch_size: 16
+max_length: 1024          # sequence length after packing
+learning_rate: 2e-4       # with cosine schedule
+warmup_ratio: 0.03        # 3% of steps warmup
+num_train_epochs: 3
+gradient_checkpointing: true
+bf16: true                # BF16 faster per-token on GB10</code>
+            </div>
+
+            <p><strong>Why BF16?</strong> On the GB10 (sm_121 Blackwell), BF16 is <strong>faster per-token than 4-bit</strong>. bitsandbytes dequantization adds overhead that costs more than the memory savings on unified memory hardware. Use native BF16 and skip quantized training entirely.</p>
+
+            <div class="sub-label">Notes</div>
+            <textarea class="note-area" data-section="training" placeholder="Record your training observations here..."></textarea>
+        </div>
+    </details>
+
+    <!-- 7. DASHBOARD MONITORING -->
+    <details>
+        <summary>
+            <span class="exp-num info">7</span>
+            Dashboard Monitoring
+        </summary>
+        <div class="content">
+            <p>The training dashboard (port 7860) gives you real-time visibility into the training run. Here's what to watch and what the signals mean.</p>
+
+            <div class="monitor-grid">
+                <div class="monitor-card">
+                    <div class="mc-title">Loss Curve</div>
+                    <div class="mc-good">Good: Smooth decrease, flattening over time</div>
+                    <div class="mc-bad">Bad: Sudden spikes, plateaus, NaN</div>
+                </div>
+                <div class="monitor-card">
+                    <div class="mc-title">Learning Rate</div>
+                    <div class="mc-good">Good: Warmup ramp &rarr; cosine decay to ~0</div>
+                    <div class="mc-bad">Bad: Should never be flat (check scheduler)</div>
+                </div>
+                <div class="monitor-card">
+                    <div class="mc-title">Gradient Norm</div>
+                    <div class="mc-good">Good: Stable range, gradual decrease</div>
+                    <div class="mc-bad">Bad: Sudden spikes = instability or bad data</div>
+                </div>
+                <div class="monitor-card">
+                    <div class="mc-title">GPU Memory</div>
+                    <div class="mc-good">Good: Stable plateau after first few steps</div>
+                    <div class="mc-bad">Bad: Steady climb = memory leak, approaching OOM</div>
+                </div>
+            </div>
+
+            <div class="sub-label">Signs of Trouble</div>
+            <p><strong>Loss plateau early</strong> &mdash; Learning rate may be too low, or the model has memorized the small dataset. Check if packing is working (if most sequences are padding, effective batch size is tiny).</p>
+            <p><strong>Gradient explosion</strong> &mdash; Grad norm spikes to 100+ then NaN. Usually caused by a corrupted training example or learning rate too high. Check the last batch before the spike.</p>
+            <p><strong>OOM after N steps</strong> &mdash; Memory leak. Make sure gradient_checkpointing is enabled. If using eval, the eval set might not fit &mdash; set <code>eval_strategy: "no"</code> for quick test runs (31K val set takes ~2.5 hours per eval pass).</p>
+            <p><strong>Train/val gap widening</strong> &mdash; Overfitting. Reduce epochs, increase dropout, or add more diverse training data. This is especially common when oversampling small domains aggressively.</p>
+        </div>
+    </details>
+
+    <!-- 8. POST-TRAINING -->
+    <div class="section-header">
+        <span>Post-Training</span>
+        <span class="line"></span>
+    </div>
+
+    <details>
+        <summary>
+            <span class="exp-num neutral">8</span>
+            Post-Training
+        </summary>
+        <div class="content">
+            <div class="sub-label">Free Trainer Memory First</div>
+            <p>Before merging, free the trainer's memory to prevent peak memory from doubling:</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>del trainer
+import gc; gc.collect()
+import torch; torch.cuda.empty_cache()</code>
+            </div>
+
+            <div class="sub-label">Merge LoRA Adapters</div>
+            <p>LoRA adapters are separate files (~170MB). To use the model without the adapter machinery, merge them back into the base weights:</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># Merge happens automatically at end of train_native.py
+# Or manually:
+from peft import PeftModel
+model = PeftModel.from_pretrained(base_model, adapter_path)
+merged = model.merge_and_unload()
+merged.save_pretrained("output/merged-16bit")</code>
+            </div>
+
+            <div class="sub-label">GGUF Quantization</div>
+            <p>For deployment with Ollama or llama.cpp, convert to GGUF format:</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># Convert merged model to GGUF Q4_K_M
+python convert_hf_to_gguf.py output/merged-16bit \
+    --outtype q4_k_m \
+    --outfile output/foundation-sec-mdr-Q4_K_M.gguf</code>
+            </div>
+
+            <div class="sub-label">Evaluation</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python eval.py</code>
+            </div>
+            <p><strong>What to check:</strong></p>
+            <p>&bull; <strong>Per-domain accuracy</strong> &mdash; Does the model handle Sigma rules as well as SIEM queries? Weak domains indicate weight tuning is needed.</p>
+            <p>&bull; <strong>Format compliance</strong> &mdash; Are generated Sigma rules valid YAML? Do SIEM queries parse in SPL/KQL?</p>
+            <p>&bull; <strong>Regression</strong> &mdash; General language quality shouldn't degrade. If the model forgets how to form coherent sentences, you've over-trained.</p>
+
+            <div class="sub-label">Notes</div>
+            <textarea class="note-area" data-section="posttraining" placeholder="Eval results, merge notes..."></textarea>
+        </div>
+    </details>
+
+    <!-- 9. COMPLETION CHECKLIST -->
+    <div class="section-header">
+        <span>Graduation</span>
+        <span class="line"></span>
+    </div>
+
+    <details open>
+        <summary>Completion Checklist</summary>
+        <div class="content">
+            <p>Check off each item when you're confident you understand it:</p>
+            <ul class="checklist">
+                <li><input type="checkbox" id="c1"><label for="c1">I understand what LoRA does and why we use it</label></li>
+                <li><input type="checkbox" id="c2"><label for="c2">I can explain domain weighting and why it matters</label></li>
+                <li><input type="checkbox" id="c3"><label for="c3">I know how to read the dashboard during training</label></li>
+                <li><input type="checkbox" id="c4"><label for="c4">I can run a full training cycle end-to-end</label></li>
+                <li><input type="checkbox" id="c5"><label for="c5">I understand the data pipeline from ingest to export</label></li>
+            </ul>
+            <p style="margin-top:16px">All checked? <a href="/learn/fast-iteration" style="color:var(--cyber-green)">Move to Phase 3: Fast Iteration &rarr;</a></p>
+        </div>
+    </details>
+
+</div>
+
+<script>
+// Copy button
+function copyCode(btn) {
+    const code = btn.parentElement.querySelector('code');
+    navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    }).catch(() => {
+        // Fallback for non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = code.textContent;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+}
+
+// Notes persistence
+document.querySelectorAll('.note-area').forEach(el => {
+    const key = 'sft_note_' + (el.dataset.experiment || el.dataset.section);
+    el.value = localStorage.getItem(key) || '';
+    el.addEventListener('input', () => localStorage.setItem(key, el.value));
+});
+
+// Checklist persistence
+document.querySelectorAll('.checklist input[type="checkbox"]').forEach(el => {
+    const key = 'sft_check_' + el.id;
+    el.checked = localStorage.getItem(key) === 'true';
+    el.addEventListener('change', () => localStorage.setItem(key, el.checked));
+});
+</script>
+
+</body>
+</html>

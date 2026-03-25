@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 3: SmolLM2 Fast Iteration — Fine-Tune MDR</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a28;
+            --text-primary: #e0e0e8;
+            --text-secondary: #888898;
+            --cyber-green: #00ff88;
+            --cyber-cyan: #00ffdd;
+            --cyber-blue: #00aaff;
+            --cyber-red: #ff4466;
+            --cyber-yellow: #ffaa00;
+            --cyber-purple: #aa66ff;
+            --border-color: #1e1e2e;
+            --accent: var(--cyber-cyan);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.7;
+        }
+
+        /* Top bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .top-bar .logo { font-size: 13px; color: var(--accent); font-weight: 600; }
+        .top-bar .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+        .top-bar .nav-link:hover { color: var(--cyber-green); }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px 24px 60px;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .hero .phase-tag {
+            display: inline-block;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+            padding: 4px 12px;
+            border-radius: 3px;
+            margin-bottom: 16px;
+        }
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .hero h1 span { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Expandable sections */
+        details {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        details[open] { border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color)); }
+        details summary {
+            padding: 16px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '\25B6';
+            font-size: 9px;
+            color: var(--accent);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+        details .content {
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 0;
+            padding-top: 16px;
+        }
+
+        /* Experiment number badge */
+        .exp-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .exp-num.baseline { background: var(--cyber-green); color: #000; }
+        .exp-num.danger { background: var(--cyber-red); color: #fff; }
+        .exp-num.warning { background: var(--cyber-yellow); color: #000; }
+        .exp-num.info { background: var(--cyber-blue); color: #fff; }
+        .exp-num.neutral { background: var(--cyber-purple); color: #fff; }
+        .exp-num.cyan { background: var(--cyber-cyan); color: #000; }
+
+        /* Code blocks */
+        .code-block {
+            position: relative;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        .code-block code {
+            font-size: 12px;
+            color: var(--cyber-green);
+            white-space: pre;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .copy-btn:hover { color: var(--cyber-green); border-color: var(--cyber-green); }
+
+        /* Subsections */
+        .sub-label {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 16px 0 6px;
+            font-weight: 600;
+        }
+        .sub-label:first-child { margin-top: 0; }
+
+        p { margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; }
+        p strong { color: var(--text-primary); }
+
+        /* Notes textarea */
+        .note-area {
+            width: 100%;
+            min-height: 60px;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 10px 12px;
+            resize: vertical;
+            margin-top: 8px;
+        }
+        .note-area::placeholder { color: #444; }
+        .note-area:focus { outline: none; border-color: var(--accent); }
+
+        /* Concept visuals */
+        .visual-box {
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .visual-box .caption {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        /* Flow diagram */
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-primary);
+            min-width: 320px;
+            transition: border-color 0.2s;
+        }
+        .flow-step:hover { border-color: var(--accent); }
+        .flow-step .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #000;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .flow-arrow {
+            font-size: 16px;
+            color: var(--accent);
+            line-height: 1;
+            padding: 2px 0;
+        }
+        .flow-branch {
+            display: flex;
+            gap: 16px;
+            margin: 0;
+        }
+        .flow-branch .flow-step { min-width: 200px; font-size: 11px; }
+        .flow-branch .flow-step.yes { border-color: var(--cyber-green); }
+        .flow-branch .flow-step.no { border-color: var(--cyber-red); }
+        .flow-branch .flow-step.yes .step-num { background: var(--cyber-green); }
+        .flow-branch .flow-step.no .step-num { background: var(--cyber-red); }
+
+        /* Transfer table */
+        .transfer-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 12px;
+        }
+        .transfer-table th {
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .transfer-table th.transfers { color: var(--cyber-green); }
+        .transfer-table th.no-transfer { color: var(--cyber-red); }
+        .transfer-table td {
+            padding: 8px 12px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid #151520;
+            vertical-align: top;
+        }
+        .transfer-table td:first-child { color: var(--text-primary); }
+
+        /* Checklist */
+        .checklist { list-style: none; }
+        .checklist li {
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checklist input[type="checkbox"] {
+            accent-color: var(--cyber-green);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Section header */
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 36px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-header .line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Speed comparison */
+        .speed-compare {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 40px;
+            margin: 10px 0;
+        }
+        .speed-bar-wrap { text-align: center; }
+        .speed-bar-wrap .label { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+        .speed-bar {
+            width: 80px;
+            border-radius: 4px 4px 0 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            padding-bottom: 6px;
+        }
+        .speed-bar-wrap .time { font-size: 10px; color: var(--text-secondary); margin-top: 4px; }
+
+        /* Architecture comparison */
+        .arch-compare {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+        .arch-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 18px;
+            text-align: center;
+            min-width: 180px;
+        }
+        .arch-card .model-name { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+        .arch-card .param-count { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+        .arch-card .arch-detail { font-size: 11px; color: var(--text-secondary); line-height: 1.8; }
+
+        /* Responsive */
+        @media (max-width: 540px) {
+            .container { padding: 24px 16px 40px; }
+            .hero h1 { font-size: 24px; }
+            .flow-step { min-width: auto; }
+            .flow-branch { flex-direction: column; gap: 4px; }
+            .flow-branch .flow-step { min-width: auto; }
+            .speed-compare { gap: 20px; }
+            .arch-compare { gap: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <span class="logo">&gt;_ Phase 3: Fast Iteration</span>
+    <div>
+        <a href="/" class="nav-link">Home</a>
+        <a href="/learn/sft" class="nav-link">&larr; Phase 2: SFT</a>
+        <a href="/learn/game-vlm" class="nav-link">Phase 4: Game VLM &rarr;</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <header class="hero">
+        <div class="phase-tag">Phase 3 &mdash; Rapid Validation</div>
+        <h1>SmolLM2 <span>Fast Iteration</span></h1>
+        <p class="subtitle">Validate data quality changes in 30 minutes instead of 12 hours. Same feedback loop, 24x faster. Ship better data to your production model.</p>
+    </header>
+
+    <!-- 1. WHY FAST ITERATION -->
+    <details open>
+        <summary>Why Fast Iteration?</summary>
+        <div class="content">
+            <p>Foundation-Sec-8B takes <strong>4-12 hours</strong> per training run on the DGX Spark. If you change domain weights and it makes things worse, you just lost half a day. That's an unacceptable feedback loop for data quality work.</p>
+            <p>SmolLM2-135M trains in <strong>~30 minutes</strong>. Same data pipeline, same ChatML format, same evaluation harness. You get the same directional feedback at <strong>24x the speed</strong>.</p>
+            <p>The key insight: <strong>small models are excellent proxies for data quality testing.</strong> If your data has formatting issues, truncation problems, or domain imbalance, SmolLM2 will reveal those problems just as clearly as an 8B model would &mdash; it just does it in a fraction of the time.</p>
+            <p>Think of it like proofreading. You don't need a Pulitzer-winning author to spot a typo &mdash; anyone who can read will do. SmolLM2 can "read" your data well enough to tell you when something is wrong.</p>
+
+            <div class="visual-box">
+                <div class="speed-compare">
+                    <div class="speed-bar-wrap">
+                        <div class="label" style="color:var(--cyber-cyan)">SmolLM2-135M</div>
+                        <div class="speed-bar" style="height:40px;background:var(--cyber-cyan);color:#000">30m</div>
+                        <div class="time">135M params</div>
+                    </div>
+                    <div class="speed-bar-wrap">
+                        <div class="label" style="color:var(--cyber-red)">Foundation-Sec-8B</div>
+                        <div class="speed-bar" style="height:240px;background:var(--cyber-red);color:#fff">4-12h</div>
+                        <div class="time">8B params</div>
+                    </div>
+                </div>
+                <div class="caption">Same data quality feedback. 24x faster iteration cycle.</div>
+            </div>
+        </div>
+    </details>
+
+    <!-- 2. ARCHITECTURE -->
+    <details>
+        <summary>SmolLM2-135M Architecture</summary>
+        <div class="content">
+            <p>SmolLM2-135M is a <strong>135 million parameter</strong> model with a Llama-style architecture. It uses the same core building blocks as Foundation-Sec-8B at 8B scale:</p>
+
+            <div class="visual-box">
+                <div class="arch-compare">
+                    <div class="arch-card">
+                        <div class="model-name" style="color:var(--cyber-cyan)">SmolLM2-135M</div>
+                        <div class="param-count" style="color:var(--cyber-cyan)">135M</div>
+                        <div class="arch-detail">
+                            RoPE Positional Encoding<br>
+                            SwiGLU Activation<br>
+                            Grouped Query Attention<br>
+                            30 min train time
+                        </div>
+                    </div>
+                    <div class="arch-card">
+                        <div class="model-name" style="color:var(--cyber-blue)">Foundation-Sec-8B</div>
+                        <div class="param-count" style="color:var(--cyber-blue)">8B</div>
+                        <div class="arch-detail">
+                            RoPE Positional Encoding<br>
+                            SwiGLU Activation<br>
+                            Grouped Query Attention<br>
+                            4-12h train time
+                        </div>
+                    </div>
+                </div>
+                <div class="caption">Same architectural patterns at different scales. Data lessons transfer directly.</div>
+            </div>
+
+            <p><strong>RoPE (Rotary Position Embedding)</strong> encodes token positions using rotation matrices, allowing the model to understand relative distances between tokens regardless of absolute position.</p>
+            <p><strong>SwiGLU</strong> is the activation function in the feed-forward layers. It combines a gated linear unit with the Swish activation, giving smoother gradient flow than standard ReLU.</p>
+            <p><strong>Grouped Query Attention (GQA)</strong> shares key-value heads across multiple query heads, reducing memory use while preserving attention quality. This is the same technique that makes 8B models fit on consumer hardware.</p>
+            <p>Because these are the <strong>same architectural patterns</strong>, what you learn about data formatting and quality on SmolLM2 transfers directly to Foundation-Sec-8B. Bad data breaks both models the same way.</p>
+        </div>
+    </details>
+
+    <!-- 3. SETUP -->
+    <details>
+        <summary>Setup</summary>
+        <div class="content">
+            <p>The fast iteration config section is already in <strong>config.yaml</strong>. Default values: LoRA r=8, alpha=16, batch_size=32, learning_rate=2e-4, 3 epochs, 30 minute time limit.</p>
+
+            <div class="sub-label">Run with default data</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python -m scripts.train_fast</code>
+            </div>
+
+            <div class="sub-label">Run with custom data file</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python -m scripts.train_fast --data data/export/chatml_train.jsonl</code>
+            </div>
+
+            <div class="sub-label">Run without dashboard</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python -m scripts.train_fast --no-dashboard</code>
+            </div>
+
+            <p>The adapter will be saved to <strong>outputs/smollm2_fast/adapter</strong>. Each run overwrites the previous one &mdash; this is intentional. Fast iteration is disposable; only your full Foundation-Sec-8B runs produce keepers.</p>
+        </div>
+    </details>
+
+    <!-- 4. THE ITERATION LOOP -->
+    <details>
+        <summary>The Iteration Loop</summary>
+        <div class="content">
+            <p>This is the core workflow. Each cycle takes about <strong>35 minutes</strong> (30 min training + 5 min eval). You can run 10+ cycles in a single day.</p>
+
+            <div class="visual-box">
+                <div class="flow-diagram">
+                    <div class="flow-step">
+                        <span class="step-num">1</span>
+                        Change domain weights or add new data
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+                    <div class="flow-step">
+                        <span class="step-num">2</span>
+                        python -m scripts.train_fast &nbsp;(30 min)
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+                    <div class="flow-step">
+                        <span class="step-num">3</span>
+                        python eval.py --model outputs/smollm2_fast/adapter
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+                    <div class="flow-branch">
+                        <div class="flow-step yes">
+                            <span class="step-num">&check;</span>
+                            Improved &rarr; promote to full run
+                        </div>
+                        <div class="flow-step no">
+                            <span class="step-num">&times;</span>
+                            No gain &rarr; revert, try again
+                        </div>
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+                    <div class="flow-step">
+                        <span class="step-num">4</span>
+                        Repeat until eval plateaus
+                    </div>
+                    <div class="flow-arrow">&darr;</div>
+                    <div class="flow-step" style="border-color:var(--cyber-green)">
+                        <span class="step-num" style="background:var(--cyber-green)">5</span>
+                        Run full Foundation-Sec-8B train (4-12h)
+                    </div>
+                </div>
+                <div class="caption">Fast iteration de-risks your full training runs. Never spend 12 hours on untested data changes.</div>
+            </div>
+
+            <p><strong>The golden rule:</strong> never run a 12-hour Foundation-Sec-8B training on data changes you haven't validated with a 30-minute SmolLM2 run first. Treat SmolLM2 as your staging environment and Foundation-Sec-8B as production.</p>
+        </div>
+    </details>
+
+    <!-- TRANSFER SECTION HEADER -->
+    <div class="section-header">
+        <span>Transfer Knowledge</span>
+        <span class="line"></span>
+    </div>
+
+    <!-- 5. WHAT TRANSFERS -->
+    <details>
+        <summary>What Transfers (and What Doesn't)</summary>
+        <div class="content">
+            <table class="transfer-table">
+                <thead>
+                    <tr>
+                        <th class="transfers">Transfers to 8B</th>
+                        <th class="no-transfer">Does NOT Transfer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Data quality issues (bad formatting, truncation)</td>
+                        <td>Absolute loss values</td>
+                    </tr>
+                    <tr>
+                        <td>Domain balance problems</td>
+                        <td>Optimal learning rate</td>
+                    </tr>
+                    <tr>
+                        <td>Prompt template effectiveness</td>
+                        <td>Convergence speed</td>
+                    </tr>
+                    <tr>
+                        <td>Instruction clarity</td>
+                        <td>Generation quality at scale</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="visual-box">
+                <p style="font-size:14px;color:var(--text-primary);font-weight:700;margin-bottom:4px">The Key Insight</p>
+                <p style="font-size:13px;color:var(--cyber-cyan);margin-bottom:0">"If SmolLM2 can't learn from your data, Foundation-Sec-8B won't either.<br>But if SmolLM2 learns well, Foundation-Sec-8B will learn <strong style="color:var(--cyber-green)">MUCH</strong> better."</p>
+            </div>
+
+            <p>Think of it this way: SmolLM2 is a <strong>litmus test for data quality</strong>. It won't tell you the final accuracy you'll get at 8B scale, but it will reliably flag problems. A 135M model struggling with your data is a red flag. A 135M model showing clear improvement after a data change is a green light.</p>
+            <p><strong>Don't compare:</strong> SmolLM2 loss 2.1 vs Foundation-Sec-8B loss 0.8. These numbers are meaningless across model scales.</p>
+            <p><strong>Do compare:</strong> SmolLM2 run A loss 2.1 vs SmolLM2 run B loss 1.9. That 10% improvement from your data change will likely translate directionally to the 8B model.</p>
+        </div>
+    </details>
+
+    <!-- 6. READING EVAL RESULTS -->
+    <details>
+        <summary>Reading Eval Results</summary>
+        <div class="content">
+            <div class="sub-label">TTP Accuracy</div>
+            <p><strong>TTP</strong> stands for <strong>Tactic, Technique, Procedure</strong> &mdash; the MITRE ATT&CK framework's hierarchy for categorizing adversary behavior. TTP accuracy measures how well your model identifies and classifies these attack patterns.</p>
+            <p>When you run eval, you'll see accuracy broken down by category: technique identification, tactic mapping, procedure description, detection rule generation, and more. Focus on the categories that matter most to your MDR use case.</p>
+
+            <div class="sub-label">Comparing Runs</div>
+            <p>The real power of fast iteration is <strong>A/B testing data changes</strong>. Here's a concrete example:</p>
+
+            <div class="visual-box">
+                <div style="text-align:left;font-size:12px;color:var(--text-secondary);line-height:2">
+                    <div><strong style="color:var(--text-primary)">Run A:</strong> siem_queries weight = 8 (current)</div>
+                    <div style="padding-left:20px;color:var(--cyber-yellow)">SPL generation accuracy: 34%</div>
+                    <div style="padding-left:20px;color:var(--cyber-yellow)">Sigma rule matching: 71%</div>
+                    <div style="margin-top:8px"><strong style="color:var(--text-primary)">Run B:</strong> siem_queries weight = 12 (+50%)</div>
+                    <div style="padding-left:20px;color:var(--cyber-green)">SPL generation accuracy: 41% &uarr;</div>
+                    <div style="padding-left:20px;color:var(--cyber-green)">Sigma rule matching: 74% &uarr;</div>
+                </div>
+                <div class="caption">If bumping siem_queries weight improves SPL generation on SmolLM2, it will likely help Foundation-Sec-8B too.</div>
+            </div>
+
+            <p><strong>Watch for regressions.</strong> If improving one domain tanks another, you have a domain balance problem. SmolLM2 is small enough that these tradeoffs show up clearly &mdash; at 8B scale, the model has enough capacity to mask minor imbalances.</p>
+        </div>
+    </details>
+
+    <!-- WORKFLOW SECTION HEADER -->
+    <div class="section-header">
+        <span>Hands-On</span>
+        <span class="line"></span>
+    </div>
+
+    <!-- 7. EXAMPLE WORKFLOW -->
+    <details>
+        <summary>Example Workflow</summary>
+        <div class="content">
+            <p>Let's walk through a real scenario: <strong>you notice Sigma rule generation is weak</strong> in your latest Foundation-Sec-8B eval. Instead of guessing and retraining for 12 hours, you test the fix in 30 minutes.</p>
+
+            <div class="sub-label">Step 1: Baseline fast run</div>
+            <p>Run a fast iteration with current settings to establish a reference point.</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python -m scripts.train_fast</code>
+            </div>
+
+            <div class="sub-label">Step 2: Evaluate baseline</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python eval.py --model outputs/smollm2_fast/adapter</code>
+            </div>
+            <p>Note the Sigma rule accuracy. Let's say it's <strong>58%</strong>.</p>
+
+            <div class="sub-label">Step 3: Bump sigma_rules weight</div>
+            <p>Edit <strong>config.yaml</strong> and change sigma_rules weight from 10 to 15:</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code># In config.yaml, under domain_weights:
+sigma_rules: 15  # was 10</code>
+            </div>
+
+            <div class="sub-label">Step 4: Re-export and retrain</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python -m scripts.export_training_data
+python -m scripts.train_fast</code>
+            </div>
+
+            <div class="sub-label">Step 5: Evaluate again</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python eval.py --model outputs/smollm2_fast/adapter</code>
+            </div>
+            <p>Sigma rule accuracy is now <strong>70%</strong> &mdash; a <strong>12% improvement</strong>. Check that other domains didn't regress significantly.</p>
+
+            <div class="sub-label">Step 6: Promote to production</div>
+            <p>The weight change works. Keep sigma_rules at 15 in config.yaml and run the full Foundation-Sec-8B training with confidence:</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>bash train.sh</code>
+            </div>
+            <p>You just saved yourself from a potential 12-hour wasted run &mdash; or confirmed that your change is worth the investment.</p>
+
+            <div class="sub-label">Notes</div>
+            <textarea class="note-area" data-note="workflow" placeholder="Record your own iteration results here..."></textarea>
+        </div>
+    </details>
+
+    <!-- 8. COMPLETION CHECKLIST -->
+    <details open>
+        <summary>Completion Checklist</summary>
+        <div class="content">
+            <p>Check off each item as you complete it. Your progress is saved automatically.</p>
+            <ul class="checklist">
+                <li><input type="checkbox" id="c1"><label for="c1">I understand why fast iteration saves time</label></li>
+                <li><input type="checkbox" id="c2"><label for="c2">I can modify domain weights and test their effect</label></li>
+                <li><input type="checkbox" id="c3"><label for="c3">I know what transfers from small to large model experiments</label></li>
+                <li><input type="checkbox" id="c4"><label for="c4">I've run at least one fast iteration cycle</label></li>
+                <li><input type="checkbox" id="c5"><label for="c5">I can interpret eval results and make data decisions</label></li>
+            </ul>
+            <p style="margin-top:16px">All checked? <a href="/learn/game-vlm" style="color:var(--cyber-cyan)">Move to Phase 4: Game VLM &rarr;</a></p>
+        </div>
+    </details>
+
+</div>
+
+<script>
+// Copy button
+function copyCode(btn) {
+    const code = btn.parentElement.querySelector('code');
+    navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    }).catch(() => {
+        // Fallback for non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = code.textContent;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+}
+
+// Notes persistence
+document.querySelectorAll('.note-area').forEach(el => {
+    const key = 'fast_iter_note_' + (el.dataset.experiment || el.dataset.note);
+    el.value = localStorage.getItem(key) || '';
+    el.addEventListener('input', () => localStorage.setItem(key, el.value));
+});
+
+// Checklist persistence
+document.querySelectorAll('.checklist input[type="checkbox"]').forEach(el => {
+    const key = 'fast_iter_check_' + el.id;
+    el.checked = localStorage.getItem(key) === 'true';
+    el.addEventListener('change', () => localStorage.setItem(key, el.checked));
+});
+</script>
+
+</body>
+</html>

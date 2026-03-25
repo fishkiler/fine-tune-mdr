@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 5: Defender RL &mdash; Fine-Tune MDR</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a28;
+            --text-primary: #e0e0e8;
+            --text-secondary: #888898;
+            --cyber-green: #00ff88;
+            --cyber-cyan: #00ffdd;
+            --cyber-blue: #00aaff;
+            --cyber-red: #ff4466;
+            --cyber-yellow: #ffaa00;
+            --cyber-purple: #aa66ff;
+            --border-color: #1e1e2e;
+            --accent: var(--cyber-blue);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.7;
+        }
+
+        /* Top bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .top-bar .logo { font-size: 13px; color: var(--accent); font-weight: 600; }
+        .top-bar .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+        .top-bar .nav-link:hover { color: var(--cyber-green); }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px 24px 60px;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .hero .phase-tag {
+            display: inline-block;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+            padding: 4px 12px;
+            border-radius: 3px;
+            margin-bottom: 16px;
+        }
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .hero h1 span { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Expandable sections */
+        details {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        details[open] { border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color)); }
+        details summary {
+            padding: 16px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '\25B6';
+            font-size: 9px;
+            color: var(--accent);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+        details .content {
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 0;
+            padding-top: 16px;
+        }
+
+        /* Experiment number badge */
+        .exp-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .exp-num.baseline { background: var(--cyber-green); color: #000; }
+        .exp-num.danger { background: var(--cyber-red); color: #fff; }
+        .exp-num.warning { background: var(--cyber-yellow); color: #000; }
+        .exp-num.info { background: var(--cyber-blue); color: #fff; }
+        .exp-num.neutral { background: var(--cyber-purple); color: #fff; }
+
+        /* Code blocks */
+        .code-block {
+            position: relative;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        .code-block code {
+            font-size: 12px;
+            color: var(--cyber-green);
+            white-space: pre;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .copy-btn:hover { color: var(--cyber-green); border-color: var(--cyber-green); }
+
+        /* Subsections */
+        .sub-label {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 16px 0 6px;
+            font-weight: 600;
+        }
+        .sub-label:first-child { margin-top: 0; }
+
+        p { margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; }
+        p strong { color: var(--text-primary); }
+
+        /* Notes textarea */
+        .note-area {
+            width: 100%;
+            min-height: 60px;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 10px 12px;
+            resize: vertical;
+            margin-top: 8px;
+        }
+        .note-area::placeholder { color: #444; }
+        .note-area:focus { outline: none; border-color: var(--accent); }
+
+        /* Concept visuals */
+        .visual-box {
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .visual-box .caption {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        /* RL Loop diagram */
+        .rl-loop {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 10px 0;
+        }
+        .rl-node {
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .rl-node.agent { background: var(--cyber-blue); color: #000; }
+        .rl-node.env { background: var(--cyber-purple); color: #fff; }
+        .rl-arrow {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+        .rl-arrow .arrow-char { font-size: 16px; color: var(--cyber-cyan); }
+
+        /* Metric indicator bars */
+        .metric-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 10px 0;
+            padding: 10px 14px;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+        .metric-row .metric-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            min-width: 110px;
+        }
+        .metric-bar-track {
+            flex: 1;
+            height: 8px;
+            background: #1a1a28;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .metric-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 1.5s ease;
+        }
+        .metric-row .metric-hint {
+            font-size: 10px;
+            color: var(--text-secondary);
+            min-width: 120px;
+            text-align: right;
+        }
+
+        /* Analogy table */
+        .analogy-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 12px;
+        }
+        .analogy-table th {
+            text-align: left;
+            padding: 10px 14px;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .analogy-table td {
+            padding: 10px 14px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .analogy-table tr:last-child td { border-bottom: none; }
+        .analogy-table td:first-child { color: var(--cyber-cyan); font-weight: 600; }
+
+        /* Wrapper boxes */
+        .wrapper-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: center;
+            margin: 12px 0;
+        }
+        .wrapper-box {
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            width: 280px;
+        }
+
+        /* Checklist */
+        .checklist { list-style: none; }
+        .checklist li {
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checklist input[type="checkbox"] {
+            accent-color: var(--cyber-green);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Section header */
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 36px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-header .line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Responsive */
+        @media (max-width: 540px) {
+            .container { padding: 24px 16px 40px; }
+            .hero h1 { font-size: 24px; }
+            .rl-loop { gap: 10px; }
+            .wrapper-box { width: 220px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <span class="logo">&gt;_ Phase 5: Defender RL</span>
+    <div>
+        <a href="/" class="nav-link">Home</a>
+        <a href="/learn/game-vlm" class="nav-link">&larr; Phase 4: Game VLM</a>
+        <a href="/learn/turboquant" class="nav-link">Phase 6: TurboQuant &rarr;</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <header class="hero">
+        <div class="phase-tag">Phase 5 &mdash; Reinforcement Learning</div>
+        <h1>Defender <span>RL</span></h1>
+        <p class="subtitle">Teach an agent to play Atari Defender using PPO. Learn how trial-and-error reward signals train policies &mdash; the same triage instinct a SOC analyst needs.</p>
+    </header>
+
+    <!-- 1. WHY RL? WHY DEFENDER? -->
+    <details open>
+        <summary>
+            <span class="exp-num info">1</span>
+            Why RL? Why Defender?
+        </summary>
+        <div class="content">
+            <p>Reinforcement learning teaches agents through <strong>trial and error + rewards</strong>. There is no labeled dataset. The agent plays, observes outcomes, and adjusts its strategy to maximize cumulative reward over time.</p>
+            <p>Defender is the perfect training ground. The game demands <strong>spatial awareness and priority triage</strong> &mdash; you must protect human astronauts from waves of aliens, deciding which threats to intercept and which to ignore. You have limited lives and limited time. Sound familiar?</p>
+            <p>This is <strong>exactly</strong> what a SOC analyst does: incoming alerts flood in, critical assets need protection, and the analyst must decide which alerts to escalate first. The RL agent learns this triage instinct from scratch, through pure experience.</p>
+        </div>
+    </details>
+
+    <!-- 2. RL FUNDAMENTALS -->
+    <details>
+        <summary>
+            <span class="exp-num baseline">2</span>
+            RL Fundamentals
+        </summary>
+        <div class="content">
+            <div class="sub-label">The RL Loop</div>
+            <div class="visual-box">
+                <div class="rl-loop">
+                    <div class="rl-node agent">Agent<br><span style="font-size:10px;font-weight:400">(Neural Network)</span></div>
+                    <div class="rl-arrow">
+                        <span style="font-size:10px">Action</span>
+                        <span class="arrow-char">&rarr;</span>
+                    </div>
+                    <div class="rl-node env">Environment<br><span style="font-size:10px;font-weight:400">(Defender Game)</span></div>
+                    <div class="rl-arrow">
+                        <span style="font-size:10px">Reward + State</span>
+                        <span class="arrow-char">&rarr;</span>
+                    </div>
+                    <div class="rl-node agent">Agent<br><span style="font-size:10px;font-weight:400">(Updates Policy)</span></div>
+                </div>
+                <div class="caption">The agent acts, the environment responds with a reward and next state, and the agent updates its strategy. Repeat millions of times.</div>
+            </div>
+
+            <div class="sub-label">Key Concepts</div>
+            <p><strong>Agent</strong> &mdash; the neural network that decides what to do. In our case, a CNN that looks at game frames.</p>
+            <p><strong>Environment</strong> &mdash; the Defender game. It accepts actions and returns the next frame + a reward signal.</p>
+            <p><strong>State</strong> &mdash; the current game frame (what the agent sees). We stack 4 frames so the agent can perceive motion.</p>
+            <p><strong>Action</strong> &mdash; joystick direction + fire button. The agent picks one action per step from the discrete action space.</p>
+            <p><strong>Reward</strong> &mdash; the game score delta. Destroy an alien = positive reward. Lose an astronaut = negative signal.</p>
+            <p><strong>Policy</strong> &mdash; the strategy mapping states to actions. This is what the agent learns. A good policy picks high-reward actions.</p>
+
+            <div class="sub-label">Key Insight</div>
+            <p>Unlike supervised fine-tuning, there are <strong>no "correct answers"</strong> in RL. Nobody tells the agent "in this frame, press fire." The agent discovers strategy through exploration &mdash; trying random actions, observing what gets rewarded, and gradually doing more of what works.</p>
+
+            <textarea class="note-area" data-experiment="rl_fundamentals" placeholder="Notes on the RL loop..."></textarea>
+        </div>
+    </details>
+
+    <!-- 3. PPO EXPLAINED -->
+    <details>
+        <summary>
+            <span class="exp-num neutral">3</span>
+            PPO Explained
+        </summary>
+        <div class="content">
+            <div class="sub-label">How PPO Works</div>
+            <p><strong>Proximal Policy Optimization</strong> in plain English: the agent plays the game and collects a batch of experiences (states, actions, rewards). Then it updates its policy to do <strong>MORE of what got rewards</strong> and <strong>LESS of what didn't</strong>.</p>
+            <p>The "proximal" part is the safety mechanism: PPO <strong>clips updates</strong> to prevent the policy from changing too drastically in a single step. Without this, one lucky batch could cause the agent to overcommit to a narrow strategy and forget everything else &mdash; catastrophic forgetting.</p>
+
+            <div class="visual-box">
+                <div style="display:flex;justify-content:center;gap:40px;flex-wrap:wrap">
+                    <div style="text-align:center">
+                        <div style="font-size:11px;color:var(--cyber-red);margin-bottom:8px">Without Clipping</div>
+                        <svg viewBox="0 0 120 80" width="140" height="90">
+                            <line x1="10" y1="40" x2="110" y2="40" stroke="#333" stroke-width="1"/>
+                            <text x="60" y="75" fill="#555" font-size="7" text-anchor="middle">Policy change</text>
+                            <rect x="15" y="25" width="90" height="30" fill="none" stroke="var(--cyber-red)" stroke-width="1" stroke-dasharray="3" rx="4"/>
+                            <circle cx="95" cy="40" r="6" fill="var(--cyber-red)">
+                                <animate attributeName="cx" values="40;95;20;90" dur="2s" repeatCount="indefinite"/>
+                            </circle>
+                        </svg>
+                    </div>
+                    <div style="text-align:center">
+                        <div style="font-size:11px;color:var(--cyber-green);margin-bottom:8px">PPO Clipping</div>
+                        <svg viewBox="0 0 120 80" width="140" height="90">
+                            <line x1="10" y1="40" x2="110" y2="40" stroke="#333" stroke-width="1"/>
+                            <text x="60" y="75" fill="#555" font-size="7" text-anchor="middle">Policy change</text>
+                            <rect x="35" y="25" width="50" height="30" fill="color-mix(in srgb, var(--cyber-green) 10%, transparent)" stroke="var(--cyber-green)" stroke-width="1" rx="4"/>
+                            <text x="60" y="20" fill="var(--cyber-green)" font-size="6" text-anchor="middle">clip zone</text>
+                            <circle cx="60" cy="40" r="6" fill="var(--cyber-green)">
+                                <animate attributeName="cx" values="50;70;55;65" dur="2s" repeatCount="indefinite"/>
+                            </circle>
+                        </svg>
+                    </div>
+                </div>
+                <div class="caption">PPO keeps updates within a safe zone. Small, steady improvements instead of wild swings.</div>
+            </div>
+
+            <div class="sub-label">The Driving Analogy</div>
+            <p>Learning to drive: you make <strong>small steering adjustments</strong> based on road feedback. PPO is this approach &mdash; gentle corrections that keep you in the lane. Without clipping, it would be like yanking the wheel hard every time you drift slightly. You might correct the drift, but you'd also overcorrect into the other lane.</p>
+
+            <textarea class="note-area" data-experiment="ppo_explained" placeholder="Notes on PPO..."></textarea>
+        </div>
+    </details>
+
+    <!-- 4. KEY PPO METRICS -->
+    <details>
+        <summary>
+            <span class="exp-num warning">4</span>
+            Key PPO Metrics
+        </summary>
+        <div class="content">
+            <p>These are the signals to watch during training. Each tells you something different about how the agent is learning.</p>
+
+            <div class="metric-row">
+                <span class="metric-name">Policy Loss</span>
+                <div class="metric-bar-track">
+                    <div class="metric-bar-fill" style="width:60%;background:var(--cyber-blue)" id="metricPolicy"></div>
+                </div>
+                <span class="metric-hint">should decrease, then stabilize</span>
+            </div>
+            <p>How much the policy is changing. Early on it drops as the agent finds better strategies. Once converged, it flattens &mdash; the agent has settled on its approach.</p>
+
+            <div class="metric-row">
+                <span class="metric-name">Value Loss</span>
+                <div class="metric-bar-track">
+                    <div class="metric-bar-fill" style="width:50%;background:var(--cyber-cyan)" id="metricValue"></div>
+                </div>
+                <span class="metric-hint">should decrease</span>
+            </div>
+            <p>How accurately the value network predicts future rewards. Lower = the agent better understands which states are valuable. A high value loss means the agent is surprised by outcomes.</p>
+
+            <div class="metric-row">
+                <span class="metric-name">Entropy</span>
+                <div class="metric-bar-track">
+                    <div class="metric-bar-fill" style="width:75%;background:var(--cyber-purple)" id="metricEntropy"></div>
+                </div>
+                <span class="metric-hint">should decrease over time</span>
+            </div>
+            <p>How <strong>random</strong> the agent's decisions are. High entropy = exploring (trying many actions). Low entropy = exploiting (confidently choosing specific actions). It should decrease as the agent becomes more decisive, but if it drops to near-zero too fast, the agent may have converged prematurely.</p>
+
+            <div class="metric-row">
+                <span class="metric-name">KL Divergence</span>
+                <div class="metric-bar-track">
+                    <div class="metric-bar-fill" style="width:20%;background:var(--cyber-yellow)" id="metricKL"></div>
+                </div>
+                <span class="metric-hint">should stay small</span>
+            </div>
+            <p>How much the new policy differs from the old one after an update. PPO aims to keep this small. A spike means the update was too aggressive &mdash; the clipping mechanism should prevent this, but watch for sustained high values.</p>
+
+            <div class="metric-row">
+                <span class="metric-name">Clip Fraction</span>
+                <div class="metric-bar-track">
+                    <div class="metric-bar-fill" style="width:35%;background:var(--cyber-green)" id="metricClip"></div>
+                </div>
+                <span class="metric-hint">0.1 &ndash; 0.2 is healthy</span>
+            </div>
+            <p>How often updates get clipped (prevented from being too large). <strong>0.1&ndash;0.2</strong> is healthy &mdash; it means the clipping is active but not dominating. Near 0 means updates are too small (learning slowly). Near 1 means almost every update is being clipped (learning rate may be too high).</p>
+
+            <textarea class="note-area" data-experiment="ppo_metrics" placeholder="Notes on metrics..."></textarea>
+        </div>
+    </details>
+
+    <!-- 5. ENVIRONMENT SETUP -->
+    <details>
+        <summary>
+            <span class="exp-num info">5</span>
+            Environment Setup
+        </summary>
+        <div class="content">
+            <div class="sub-label">Atari Wrappers</div>
+            <p>The raw Atari environment needs several wrappers to make RL training efficient. Each one solves a specific problem:</p>
+
+            <div class="visual-box">
+                <div class="wrapper-stack">
+                    <div class="wrapper-box" style="background:var(--cyber-blue);color:#000">VecTransposeImage <span style="font-size:9px;font-weight:400">&mdash; channels-first for CNN</span></div>
+                    <div style="font-size:14px;color:var(--text-secondary)">&uarr;</div>
+                    <div class="wrapper-box" style="background:var(--cyber-cyan);color:#000">VecFrameStack(4) <span style="font-size:9px;font-weight:400">&mdash; stack 4 frames for motion</span></div>
+                    <div style="font-size:14px;color:var(--text-secondary)">&uarr;</div>
+                    <div class="wrapper-box" style="background:var(--cyber-purple);color:#fff">AtariWrapper <span style="font-size:9px;font-weight:400">&mdash; frame skip + terminal on life loss</span></div>
+                    <div style="font-size:14px;color:var(--text-secondary)">&uarr;</div>
+                    <div class="wrapper-box" style="background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border-color)">Raw Atari Env <span style="font-size:9px">&mdash; DefenderNoFrameskip-v4</span></div>
+                </div>
+                <div class="caption">Wrappers stack from bottom to top. Each transforms the observation or reward before passing it up.</div>
+            </div>
+
+            <p><strong>AtariWrapper</strong> &mdash; skips every 4th frame (the agent doesn't need 60fps decisions), and treats losing a life as terminal. This makes the agent value staying alive.</p>
+            <p><strong>VecFrameStack(4)</strong> &mdash; stacks 4 consecutive frames together. A single frame is a photo &mdash; no motion info. Four frames show direction and speed of aliens and the ship.</p>
+            <p><strong>VecTransposeImage</strong> &mdash; rearranges image dimensions from HWC to CHW format. PyTorch CNNs expect channels first.</p>
+
+            <div class="sub-label">Parallel Environments</div>
+            <p>We run <strong>8 parallel environments</strong> simultaneously. Each one plays a different game, collecting diverse experience. More environments = more varied training data per update step, which stabilizes learning.</p>
+
+            <div class="sub-label">Config Values</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>n_envs: 8          # parallel game instances
+n_steps: 128       # steps per env before update
+batch_size: 256    # minibatch size for PPO updates
+                   # total experience per update = 8 * 128 = 1024 steps</code>
+            </div>
+
+            <textarea class="note-area" data-experiment="env_setup" placeholder="Notes on environment setup..."></textarea>
+        </div>
+    </details>
+
+    <!-- 6. TRAINING WALKTHROUGH -->
+    <div class="section-header">
+        <span>Hands On</span>
+        <span class="line"></span>
+    </div>
+
+    <details>
+        <summary>
+            <span class="exp-num baseline">6</span>
+            Training Walkthrough
+        </summary>
+        <div class="content">
+            <div class="sub-label">Start Training</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python games/defender.py train                    # 1M steps (default)
+python games/defender.py train --steps 2000000    # 2M steps</code>
+            </div>
+
+            <div class="sub-label">What to Expect</div>
+            <p><strong>Early episodes (0&ndash;200K steps)</strong> &mdash; random play. The agent moves erratically, fires without aiming. Reward ~100&ndash;500. This is pure exploration &mdash; the agent is building its first map of what actions lead to rewards.</p>
+            <p><strong>Mid-training (200K&ndash;600K steps)</strong> &mdash; basic strategy emerges. The agent learns to move toward aliens and fire. Reward ~2,000&ndash;5,000. You'll see the reward curve start climbing steadily.</p>
+            <p><strong>Converged (600K&ndash;1M steps)</strong> &mdash; skilled play. The agent prioritizes threats, protects astronauts, uses the full screen. Reward ~5,000&ndash;10,000. The reward curve flattens &mdash; the agent has found its strategy.</p>
+
+            <div class="sub-label">Training Time</div>
+            <p>~<strong>18 minutes</strong> for 1M steps on DGX Spark. Fast enough to iterate on hyperparameters. You can watch progress live on the <a href="/rl" style="color:var(--accent)">/rl dashboard</a>.</p>
+
+            <textarea class="note-area" data-experiment="training" placeholder="Record your training results here..."></textarea>
+        </div>
+    </details>
+
+    <!-- 7. READING RL DASHBOARD -->
+    <details>
+        <summary>
+            <span class="exp-num info">7</span>
+            Reading RL Dashboard Metrics
+        </summary>
+        <div class="content">
+            <p>The <a href="/rl" style="color:var(--accent)">/rl dashboard</a> shows live training metrics. Here is what to watch:</p>
+
+            <div class="sub-label">Mean Reward (Primary Metric)</div>
+            <p>100-episode rolling average reward. This is the <strong>single most important number</strong>. It should trend upward over training. If it plateaus, the agent has converged. If it drops, something went wrong (learning rate too high, or the environment changed).</p>
+
+            <div class="sub-label">Episode Length</div>
+            <p>How long the agent survives per episode. <strong>Shorter</strong> episodes early on = dying fast (normal). <strong>Longer</strong> episodes = surviving more waves. If episode length suddenly drops mid-training, the agent may have learned a degenerate strategy.</p>
+
+            <div class="sub-label">FPS (Throughput)</div>
+            <p>Frames processed per second. On DGX Spark: ~<strong>937 FPS</strong>. This should stay constant. A drop means something is bottlenecking (CPU env stepping, or GPU memory pressure).</p>
+
+            <div class="sub-label">Convergence Signals</div>
+            <p>Training is converged when you see all of these simultaneously:</p>
+            <p>&bull; Reward curve has <strong>plateaued</strong> (flat for 100K+ steps)</p>
+            <p>&bull; Entropy is <strong>low</strong> (agent is decisive, not exploring)</p>
+            <p>&bull; Policy loss is <strong>stable</strong> (no more big swings)</p>
+            <p>&bull; Clip fraction around <strong>0.1&ndash;0.2</strong> (updates are controlled)</p>
+
+            <textarea class="note-area" data-experiment="dashboard" placeholder="Notes on dashboard readings..."></textarea>
+        </div>
+    </details>
+
+    <!-- 8. PLAY MODE -->
+    <details>
+        <summary>
+            <span class="exp-num baseline">8</span>
+            Play Mode
+        </summary>
+        <div class="content">
+            <div class="sub-label">Watch the Trained Agent</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python games/defender.py play</code>
+            </div>
+
+            <div class="sub-label">What to Look For</div>
+            <p><strong>Threat prioritization</strong> &mdash; does the agent go after the nearest aliens first, or does it chase distant ones? A good agent prioritizes nearby threats that endanger astronauts.</p>
+            <p><strong>Astronaut protection</strong> &mdash; does the agent position itself between aliens and the astronauts on the ground? This shows the agent learned that losing astronauts is costly.</p>
+            <p><strong>Retreat behavior</strong> &mdash; when overwhelmed by a swarm, does the agent pull back and regroup? Or does it charge in and die? Smart retreat is a sign of long-horizon planning.</p>
+
+            <div class="sub-label">Common Failure Modes</div>
+            <p>&bull; <strong>Always moving one direction</strong> &mdash; the agent found a local optimum (e.g., "flying right gets some reward") and never explored alternatives. Needs more entropy/exploration.</p>
+            <p>&bull; <strong>Ignoring one side of screen</strong> &mdash; the agent only learned to deal with threats in its immediate view. The CNN may not be processing the full frame effectively.</p>
+            <p>&bull; <strong>Never using hyperspace</strong> &mdash; hyperspace (emergency teleport) is risky but sometimes necessary. If the agent never uses it, it may not have encountered enough near-death scenarios during training.</p>
+
+            <textarea class="note-area" data-experiment="play_mode" placeholder="Describe the agent's behavior..."></textarea>
+        </div>
+    </details>
+
+    <!-- 9. CONNECTION TO MDR -->
+    <div class="section-header">
+        <span>MDR Connection</span>
+        <span class="line"></span>
+    </div>
+
+    <details>
+        <summary>
+            <span class="exp-num danger">9</span>
+            Connection to MDR
+        </summary>
+        <div class="content">
+            <p>The Defender RL agent and a SOC analyst face the <strong>same fundamental problem</strong>: prioritize threats under resource constraints. The analogy runs deep:</p>
+
+            <table class="analogy-table">
+                <thead>
+                    <tr>
+                        <th>Defender (Game)</th>
+                        <th>MDR (Security)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Alien waves</td>
+                        <td>Incoming security alerts</td>
+                    </tr>
+                    <tr>
+                        <td>Astronauts to protect</td>
+                        <td>Critical assets (servers, data, endpoints)</td>
+                    </tr>
+                    <tr>
+                        <td>Limited lives &amp; ammo</td>
+                        <td>Limited analyst time &amp; attention</td>
+                    </tr>
+                    <tr>
+                        <td>Priority triage</td>
+                        <td>Which alert to investigate first</td>
+                    </tr>
+                    <tr>
+                        <td>Spatial awareness</td>
+                        <td>Understanding attack scope &amp; blast radius</td>
+                    </tr>
+                    <tr>
+                        <td>Threat escalation</td>
+                        <td>Escalating critical incidents to senior analysts</td>
+                    </tr>
+                    <tr>
+                        <td>Hyperspace retreat</td>
+                        <td>Isolating a compromised system</td>
+                    </tr>
+                    <tr>
+                        <td>Score maximization</td>
+                        <td>Minimizing mean time to respond (MTTR)</td>
+                    </tr>
+                    <tr>
+                        <td>Multi-wave survival</td>
+                        <td>Sustained 24/7 alert monitoring</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>The RL-trained Defender agent learns to <strong>triage</strong> &mdash; the same skill SOC analysts need. It discovers that protecting high-value targets (astronauts) matters more than chasing every alien. It learns when to fight and when to retreat. These are not programmed rules &mdash; they emerge from reward optimization, just like analyst intuition emerges from experience.</p>
+
+            <textarea class="note-area" data-experiment="mdr_connection" placeholder="Your thoughts on the MDR connection..."></textarea>
+        </div>
+    </details>
+
+    <!-- 10. COMPLETION CHECKLIST -->
+    <div class="section-header">
+        <span>Graduation</span>
+        <span class="line"></span>
+    </div>
+
+    <details open>
+        <summary>Completion Checklist</summary>
+        <div class="content">
+            <p>Check off each item honestly. You're ready for Phase 6 when all boxes are checked:</p>
+            <ul class="checklist">
+                <li><input type="checkbox" id="g1"><label for="g1">I understand the RL loop (agent, environment, reward, policy)</label></li>
+                <li><input type="checkbox" id="g2"><label for="g2">I can explain what PPO does in plain English</label></li>
+                <li><input type="checkbox" id="g3"><label for="g3">I know what entropy, KL divergence, and clip fraction mean</label></li>
+                <li><input type="checkbox" id="g4"><label for="g4">I can run a training cycle and interpret dashboard metrics</label></li>
+                <li><input type="checkbox" id="g5"><label for="g5">I understand the connection between Defender gameplay and MDR alert triage</label></li>
+            </ul>
+            <p style="margin-top:16px">All checked? <a href="/learn/turboquant" style="color:var(--cyber-green)">Move to Phase 6: TurboQuant &rarr;</a></p>
+        </div>
+    </details>
+
+</div>
+
+<script>
+// Copy button
+function copyCode(btn) {
+    const code = btn.parentElement.querySelector('code');
+    navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    }).catch(() => {
+        // Fallback for non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = code.textContent;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+}
+
+// Notes persistence
+document.querySelectorAll('.note-area').forEach(el => {
+    const key = 'defender_rl_note_' + el.dataset.experiment;
+    el.value = localStorage.getItem(key) || '';
+    el.addEventListener('input', () => localStorage.setItem(key, el.value));
+});
+
+// Checklist persistence
+document.querySelectorAll('.checklist input[type="checkbox"]').forEach(el => {
+    const key = 'defender_rl_check_' + el.id;
+    el.checked = localStorage.getItem(key) === 'true';
+    el.addEventListener('change', () => localStorage.setItem(key, el.checked));
+});
+
+// Animate metric bars on scroll
+const metricObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            const fills = entry.target.querySelectorAll('.metric-bar-fill');
+            fills.forEach(fill => {
+                const target = fill.style.width;
+                fill.style.width = '0%';
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        fill.style.width = target;
+                    });
+                });
+            });
+            metricObserver.unobserve(entry.target);
+        }
+    });
+}, { threshold: 0.3 });
+
+document.querySelectorAll('.metric-row').forEach(row => metricObserver.observe(row));
+</script>
+
+</body>
+</html>

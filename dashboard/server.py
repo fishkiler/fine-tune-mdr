@@ -681,6 +681,36 @@ async def serve_learn_autoresearch():
     return FileResponse(STATIC_DIR / "learn_autoresearch.html")
 
 
+@app.get("/learn/sft")
+async def serve_learn_sft():
+    """Serve the SFT training tutorial page."""
+    return FileResponse(STATIC_DIR / "learn_sft.html")
+
+
+@app.get("/learn/fast-iteration")
+async def serve_learn_fast_iteration():
+    """Serve the fast iteration tutorial page."""
+    return FileResponse(STATIC_DIR / "learn_fast_iteration.html")
+
+
+@app.get("/learn/game-vlm")
+async def serve_learn_game_vlm():
+    """Serve the game VLM tutorial page."""
+    return FileResponse(STATIC_DIR / "learn_game_vlm.html")
+
+
+@app.get("/learn/defender-rl")
+async def serve_learn_defender_rl():
+    """Serve the Defender RL tutorial page."""
+    return FileResponse(STATIC_DIR / "learn_defender_rl.html")
+
+
+@app.get("/learn/turboquant")
+async def serve_learn_turboquant():
+    """Serve the TurboQuant tutorial page."""
+    return FileResponse(STATIC_DIR / "learn_turboquant.html")
+
+
 @app.get("/static/{filename}")
 async def serve_static(filename: str):
     """Serve static assets."""

@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 4: Game VLM Adapter — Fine-Tune MDR</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a28;
+            --text-primary: #e0e0e8;
+            --text-secondary: #888898;
+            --cyber-green: #00ff88;
+            --cyber-cyan: #00ffdd;
+            --cyber-blue: #00aaff;
+            --cyber-red: #ff4466;
+            --cyber-yellow: #ffaa00;
+            --cyber-purple: #aa66ff;
+            --border-color: #1e1e2e;
+            --accent: var(--cyber-yellow);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.7;
+        }
+
+        /* Top bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .top-bar .logo { font-size: 13px; color: var(--accent); font-weight: 600; }
+        .top-bar .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            margin-left: 16px;
+            transition: color 0.2s;
+        }
+        .top-bar .nav-link:hover { color: var(--cyber-green); }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px 24px 60px;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .hero .phase-tag {
+            display: inline-block;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+            padding: 4px 12px;
+            border-radius: 3px;
+            margin-bottom: 16px;
+        }
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .hero h1 span { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Expandable sections */
+        details {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        details[open] { border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color)); }
+        details summary {
+            padding: 16px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '\25B6';
+            font-size: 9px;
+            color: var(--accent);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+        details .content {
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 0;
+            padding-top: 16px;
+        }
+
+        /* Experiment number badge */
+        .exp-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .exp-num.baseline { background: var(--cyber-green); color: #000; }
+        .exp-num.danger { background: var(--cyber-red); color: #fff; }
+        .exp-num.warning { background: var(--cyber-yellow); color: #000; }
+        .exp-num.info { background: var(--cyber-blue); color: #fff; }
+        .exp-num.neutral { background: var(--cyber-purple); color: #fff; }
+
+        /* Code blocks */
+        .code-block {
+            position: relative;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        .code-block code {
+            font-size: 12px;
+            color: var(--cyber-green);
+            white-space: pre;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .copy-btn:hover { color: var(--cyber-green); border-color: var(--cyber-green); }
+
+        /* Subsections */
+        .sub-label {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 16px 0 6px;
+            font-weight: 600;
+        }
+        .sub-label:first-child { margin-top: 0; }
+
+        p { margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; }
+        p strong { color: var(--text-primary); }
+
+        /* Notes textarea */
+        .note-area {
+            width: 100%;
+            min-height: 60px;
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 10px 12px;
+            resize: vertical;
+            margin-top: 8px;
+        }
+        .note-area::placeholder { color: #444; }
+        .note-area:focus { outline: none; border-color: var(--accent); }
+
+        /* Concept visuals */
+        .visual-box {
+            background: #0d0d14;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .visual-box .caption {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        /* VLM pipeline visual */
+        .vlm-pipeline {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 10px 0;
+        }
+        .vlm-stage {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 80px;
+        }
+        .vlm-arrow {
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+
+        /* LoRA comparison */
+        .lora-compare {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+        .lora-card {
+            text-align: center;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            min-width: 140px;
+        }
+        .lora-card .rank-val {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 8px 0 4px;
+        }
+        .lora-card .rank-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* Action space grid */
+        .action-grid {
+            display: inline-grid;
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 4px;
+        }
+        .action-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .action-cell.active {
+            background: var(--cyber-yellow);
+            color: #000;
+        }
+        .action-cell.empty {
+            background: transparent;
+        }
+        .action-cell.center {
+            background: var(--cyber-blue);
+            color: #fff;
+        }
+
+        /* Checklist */
+        .checklist { list-style: none; }
+        .checklist li {
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checklist input[type="checkbox"] {
+            accent-color: var(--cyber-green);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Section header */
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 36px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-header .line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Balance bar */
+        .balance-bar {
+            display: flex;
+            height: 24px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .balance-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        /* Responsive */
+        @media (max-width: 540px) {
+            .container { padding: 24px 16px 40px; }
+            .hero h1 { font-size: 24px; }
+            .vlm-pipeline { gap: 4px; }
+            .lora-compare { gap: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <span class="logo">&gt;_ Phase 4: Game VLM</span>
+    <div>
+        <a href="/" class="nav-link">Home</a>
+        <a href="/learn/fast-iteration" class="nav-link">&larr; Phase 3: Fast Iteration</a>
+        <a href="/learn/defender-rl" class="nav-link">Phase 5: Defender RL &rarr;</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <header class="hero">
+        <div class="phase-tag">Phase 4 &mdash; Vision</div>
+        <h1>Game <span>VLM</span> Adapter</h1>
+        <p class="subtitle">Train a vision-language model to play Pac-Man. The observe-reason-act loop you build here is the same architecture that drives TARS robotics and robot navigation.</p>
+    </header>
+
+    <!-- 1. WHY GAME VLM -->
+    <details open>
+        <summary>
+            <span class="exp-num warning">1</span>
+            Why Game VLM?
+        </summary>
+        <div class="content">
+            <p>The visual decision-making loop &mdash; <strong>observe frame, reason, act</strong> &mdash; is the same architecture needed for TARS robotics and robot navigation. A robot sees camera frames, reasons about obstacles and goals, then issues motor commands. That's exactly what a game-playing VLM does.</p>
+            <p>Pac-Man is the training ground: <strong>simple enough to learn fast</strong>, complex enough to require real spatial reasoning. The maze has structure, ghosts create dynamic threats, pellets demand path planning. If the model can navigate a Pac-Man board, the same visual grounding transfers to navigating a warehouse floor.</p>
+            <p>This phase bridges the gap between text-only fine-tuning (Phases 0-3) and embodied AI. You already know how to train language models. Now you teach one to <strong>see</strong>.</p>
+        </div>
+    </details>
+
+    <!-- 2. VLMs EXPLAINED -->
+    <details>
+        <summary>
+            <span class="exp-num info">2</span>
+            Vision-Language Models Explained
+        </summary>
+        <div class="content">
+            <div class="sub-label">How VLMs Work</div>
+            <p>A VLM combines two systems: an <strong>image encoder</strong> (vision tower) that converts pixels into "visual tokens", and a <strong>language model</strong> that processes those tokens alongside text. The key insight is a <strong>projection layer</strong> that maps visual features into the same embedding space as text tokens. Once projected, the LLM can't tell the difference &mdash; images become just another sequence of tokens.</p>
+
+            <div class="visual-box">
+                <div class="vlm-pipeline">
+                    <div class="vlm-stage" style="background:var(--cyber-blue);color:#fff;">Image<br><span style="font-size:9px;">552x456 px</span></div>
+                    <div class="vlm-arrow">&rarr;</div>
+                    <div class="vlm-stage" style="background:var(--cyber-purple);color:#fff;">Vision<br>Encoder</div>
+                    <div class="vlm-arrow">&rarr;</div>
+                    <div class="vlm-stage" style="background:var(--cyber-yellow);color:#000;">Projection<br>Layer</div>
+                    <div class="vlm-arrow">&rarr;</div>
+                    <div class="vlm-stage" style="background:#1e1e2e;color:var(--cyber-cyan);border:1px solid var(--border-color);">[visual tokens<br>+ text tokens]</div>
+                    <div class="vlm-arrow">&rarr;</div>
+                    <div class="vlm-stage" style="background:var(--cyber-green);color:#000;">LLM</div>
+                    <div class="vlm-arrow">&rarr;</div>
+                    <div class="vlm-stage" style="background:var(--cyber-red);color:#fff;">Action</div>
+                </div>
+                <div class="caption">The vision encoder converts pixels into tokens. The projection layer aligns them with the text embedding space. The LLM processes both together.</div>
+            </div>
+
+            <div class="sub-label">Why This Matters</div>
+            <p>Traditional computer vision outputs labels or bounding boxes. A VLM outputs <strong>language</strong> &mdash; it can explain what it sees, reason about spatial relationships, and justify its decisions. That reasoning chain is what makes game-playing (and eventually robot navigation) possible.</p>
+        </div>
+    </details>
+
+    <!-- 3. QWEN ARCHITECTURE -->
+    <details>
+        <summary>
+            <span class="exp-num neutral">3</span>
+            Qwen3.5-9B Architecture
+        </summary>
+        <div class="content">
+            <div class="sub-label">Model Overview</div>
+            <p><strong>9 billion parameters</strong> with built-in vision capabilities. Unlike some VLMs that bolt a vision encoder onto a text-only model, Qwen was designed from the ground up to handle multimodal input. The vision tower processes images at configurable resolution with <strong>min_pixels: 50,176</strong> and <strong>max_pixels: 100,352</strong>.</p>
+
+            <div class="sub-label">Key Features</div>
+            <p><strong>Multi-image input</strong> &mdash; the model can process multiple frames in a single prompt, enabling temporal reasoning across game states. This is critical for understanding movement direction and predicting ghost trajectories.</p>
+            <p><strong>Configurable resolution</strong> &mdash; reducing max_pixels speeds up training significantly. Pac-Man frames don't need high-res detail; the maze structure and entity positions are clear even at lower resolution.</p>
+
+            <div class="sub-label">Why Qwen Over Other VLMs</div>
+            <p>Qwen was chosen for several reasons: <strong>native vision support</strong> (no adapter hacks), <strong>efficient token usage</strong> (visual tokens are compressed well), <strong>strong spatial reasoning</strong> in benchmarks, and <strong>9B is trainable on DGX Spark</strong> with LoRA. Larger VLMs like LLaVA-34B would require multi-GPU setups. Smaller ones like LLaVA-7B lack the reasoning depth for complex game states.</p>
+
+            <textarea class="note-area" data-experiment="arch" placeholder="Notes on the architecture..."></textarea>
+        </div>
+    </details>
+
+    <!-- 4. PAC-MAN TRAINING GROUND -->
+    <details>
+        <summary>
+            <span class="exp-num warning">4</span>
+            Pac-Man as Training Ground
+        </summary>
+        <div class="content">
+            <div class="sub-label">Frame Specification</div>
+            <p>Frame resolution: <strong>552x456 pixels</strong>. Each frame captures the full maze, Pac-Man's position, ghost positions, pellet locations, and the score. The visual complexity is manageable but non-trivial &mdash; the model must learn to parse a structured 2D environment.</p>
+
+            <div class="sub-label">Action Space</div>
+            <div class="visual-box">
+                <div class="action-grid">
+                    <div class="action-cell empty"></div>
+                    <div class="action-cell active">UP</div>
+                    <div class="action-cell empty"></div>
+                    <div class="action-cell active">LEFT</div>
+                    <div class="action-cell center">NONE</div>
+                    <div class="action-cell active">RIGHT</div>
+                    <div class="action-cell empty"></div>
+                    <div class="action-cell active">DOWN</div>
+                    <div class="action-cell empty"></div>
+                </div>
+                <div class="caption">5 discrete actions: NONE (continue current direction), UP, DOWN, LEFT, RIGHT</div>
+            </div>
+
+            <div class="sub-label">System Prompt</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>You are TARS, playing Pac-Man. Analyze the game frame and choose an action.
+ACTIONS: NONE (continue current direction), UP, DOWN, LEFT, RIGHT
+Respond with brief reasoning followed by: Action: &lt;ACTION&gt;</code>
+            </div>
+            <p>The model must output <strong>reasoning first, then a structured action</strong>. This chain-of-thought format forces the model to articulate what it sees before deciding, which improves action quality and makes failures debuggable.</p>
+
+            <div class="sub-label">Dataset Structure</div>
+            <p>Frame images paired with expert actions. Training examples are organized as <strong>episode-based sequences</strong> for temporal learning &mdash; the model sees frames in the order they occurred during gameplay, building an implicit sense of movement and game flow.</p>
+
+            <textarea class="note-area" data-experiment="pacman" placeholder="Notes on the Pac-Man setup..."></textarea>
+        </div>
+    </details>
+
+    <!-- 5. LoRA FOR VLMs -->
+    <details>
+        <summary>
+            <span class="exp-num info">5</span>
+            LoRA for VLMs
+        </summary>
+        <div class="content">
+            <div class="sub-label">Same Concept, Different Application</div>
+            <p>LoRA (Low-Rank Adaptation) works the same way as in text-only fine-tuning: inject small trainable matrices into the model's attention layers while keeping the original weights frozen. The key difference for VLMs: <strong>LoRA is applied to the language model layers only</strong>, not the vision encoder. The vision tower stays frozen &mdash; it already knows how to see. We're teaching the LLM how to <strong>reason about what it sees</strong>.</p>
+
+            <div class="sub-label">Configuration</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>LoRA Config:
+  r: 32              # Rank (higher than text SFT)
+  alpha: 64           # Scaling factor (2x rank)
+  targets:
+    - q_proj          # Query projection
+    - k_proj          # Key projection
+    - v_proj          # Value projection
+    - o_proj          # Output projection
+    - gate_proj       # MLP gate
+    - up_proj         # MLP up
+    - down_proj       # MLP down</code>
+            </div>
+
+            <div class="sub-label">Why Higher Rank?</div>
+            <p>Text SFT typically uses <strong>r=16</strong>. Game VLM uses <strong>r=32</strong>. Visual reasoning is more complex than text pattern matching &mdash; the model needs more trainable parameters to learn the mapping from spatial features to appropriate actions. The higher rank gives the adapter more capacity to capture the visual-to-action relationship.</p>
+
+            <div class="visual-box">
+                <div class="lora-compare">
+                    <div class="lora-card">
+                        <div style="font-size:11px;color:var(--cyber-cyan);">Text SFT</div>
+                        <div class="rank-val" style="color:var(--cyber-cyan);">r=16</div>
+                        <div class="rank-label">Language patterns</div>
+                    </div>
+                    <div class="lora-card">
+                        <div style="font-size:11px;color:var(--cyber-yellow);">Game VLM</div>
+                        <div class="rank-val" style="color:var(--cyber-yellow);">r=32</div>
+                        <div class="rank-label">Visual reasoning</div>
+                    </div>
+                </div>
+                <div class="caption">Higher rank = more trainable parameters = more capacity for complex visual-to-action mappings.</div>
+            </div>
+
+            <textarea class="note-area" data-experiment="lora" placeholder="Notes on LoRA configuration..."></textarea>
+        </div>
+    </details>
+
+    <!-- 6. DATASET STRUCTURE -->
+    <details>
+        <summary>
+            <span class="exp-num baseline">6</span>
+            Dataset Structure
+        </summary>
+        <div class="content">
+            <div class="sub-label">File Layout</div>
+            <p>Frame images are stored in <strong>data/games/pacman/</strong>. Each training example is a conversation pair: the user provides an image with "analyze this frame", and the assistant responds with reasoning followed by an action.</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>Training example format:
+  User:    [image] Analyze this game frame and choose an action.
+  Assistant: Pac-Man is heading right in the middle corridor.
+             A ghost is approaching from above. The nearest
+             pellet cluster is to the left.
+             Action: LEFT</code>
+            </div>
+
+            <div class="sub-label">Action Balance</div>
+            <p>Without balancing, the dataset would be dominated by <strong>NONE</strong> actions (continue current direction). In most frames, the optimal move is to keep going. But if the model learns to always say NONE, it never turns &mdash; useless.</p>
+            <p>Two mechanisms fix this:</p>
+            <p><strong>max_noop_ratio=0.25</strong> &mdash; caps NONE actions at 25% of the dataset. Excess NONE frames are discarded.</p>
+            <p><strong>decision_point_oversample=3</strong> &mdash; frames where the expert changes direction are duplicated 3x. These are the critical moments: turns, ghost avoidance, pellet pursuit. The model sees them more often.</p>
+
+            <div class="visual-box">
+                <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">Dataset composition after balancing</div>
+                <div class="balance-bar">
+                    <div class="balance-segment" style="flex:25;background:var(--text-secondary);color:#000;">NONE 25%</div>
+                    <div class="balance-segment" style="flex:20;background:var(--cyber-yellow);color:#000;">UP 20%</div>
+                    <div class="balance-segment" style="flex:20;background:var(--cyber-blue);color:#fff;">DOWN 20%</div>
+                    <div class="balance-segment" style="flex:18;background:var(--cyber-green);color:#000;">LEFT 18%</div>
+                    <div class="balance-segment" style="flex:17;background:var(--cyber-purple);color:#fff;">RIGHT 17%</div>
+                </div>
+                <div class="caption">Without balancing, NONE would dominate at ~60%. Capping and oversampling create a healthy distribution.</div>
+            </div>
+
+            <textarea class="note-area" data-experiment="dataset" placeholder="Notes on dataset structure..."></textarea>
+        </div>
+    </details>
+
+    <!-- TRAINING & EVAL -->
+    <div class="section-header">
+        <span>Training &amp; Evaluation</span>
+        <span class="line"></span>
+    </div>
+
+    <!-- 7. TRAINING WALKTHROUGH -->
+    <details>
+        <summary>
+            <span class="exp-num warning">7</span>
+            Training Walkthrough
+        </summary>
+        <div class="content">
+            <div class="sub-label">Running Training</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>cd games
+bash train_game.sh
+# Or directly:
+python train_game_adapter.py</code>
+            </div>
+
+            <div class="sub-label">What to Watch</div>
+            <p><strong>Loss should decrease</strong>, but VLM training is noisier than text-only. Each batch contains images of different game states with different optimal actions &mdash; the gradient signal is inherently more variable.</p>
+            <p><strong>Image processing is slower per step.</strong> Each training step must encode frames through the vision tower before the LLM forward pass. Expect 3-5x slower steps compared to text-only SFT at the same sequence length.</p>
+            <p><strong>Reduced pixel bounds speed things up.</strong> The configurable min_pixels/max_pixels in the Qwen config control how many visual tokens each image produces. Fewer pixels = fewer tokens = faster training, at the cost of visual detail. For Pac-Man's simple graphics, the reduced bounds are sufficient.</p>
+
+            <div class="sub-label">Expected Training Curve</div>
+            <p>Unlike text SFT where loss drops smoothly, VLM training often shows <strong>plateaus followed by sudden drops</strong>. The model may spend many steps learning basic visual parsing before suddenly "getting" spatial relationships. Don't panic if loss stalls for a while &mdash; that's normal for visual tasks.</p>
+
+            <textarea class="note-area" data-experiment="training" placeholder="Paste training metrics here..."></textarea>
+        </div>
+    </details>
+
+    <!-- 8. EVALUATION -->
+    <details>
+        <summary>
+            <span class="exp-num info">8</span>
+            Evaluation
+        </summary>
+        <div class="content">
+            <div class="sub-label">Running Eval</div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <code>python games/eval_game_adapter.py</code>
+            </div>
+
+            <div class="sub-label">What to Look For</div>
+            <p><strong>Action appropriateness</strong> &mdash; does the model choose sensible actions given the game state? Is it turning away from ghosts? Moving toward pellets?</p>
+            <p><strong>Reasoning quality</strong> &mdash; does the model explain what it sees? A good response identifies Pac-Man's position, nearby threats, and pellet locations before choosing an action. A bad response gives a vague justification or ignores visible threats.</p>
+
+            <div class="sub-label">Common Failure Modes</div>
+            <p><strong>Directional bias</strong> &mdash; the model favors one direction (e.g., always RIGHT). This usually means the dataset wasn't balanced well, or the model hasn't trained long enough to learn spatial nuance.</p>
+            <p><strong>Ignoring ghosts</strong> &mdash; the model walks straight into threats. The vision encoder may be struggling to distinguish ghost sprites from background elements. Check that frame resolution is sufficient.</p>
+            <p><strong>Not pursuing pellets</strong> &mdash; the model wanders aimlessly instead of path-planning toward pellet clusters. This is a higher-order reasoning failure that typically improves with more training steps.</p>
+
+            <textarea class="note-area" data-experiment="eval" placeholder="Evaluation observations..."></textarea>
+        </div>
+    </details>
+
+    <!-- 9. CONNECTION TO ROBOTICS -->
+    <details>
+        <summary>
+            <span class="exp-num neutral">9</span>
+            Connection to Robotics
+        </summary>
+        <div class="content">
+            <div class="sub-label">The Observe-Reason-Act Loop</div>
+            <p>Everything you've built in this phase follows the same loop that drives real robotic systems:</p>
+
+            <div class="visual-box">
+                <div class="vlm-pipeline">
+                    <div class="vlm-stage" style="background:var(--cyber-blue);color:#fff;">Observe<br><span style="font-size:9px;">camera frame</span></div>
+                    <div class="vlm-arrow">&rarr;</div>
+                    <div class="vlm-stage" style="background:var(--cyber-yellow);color:#000;">Reason<br><span style="font-size:9px;">spatial analysis</span></div>
+                    <div class="vlm-arrow">&rarr;</div>
+                    <div class="vlm-stage" style="background:var(--cyber-green);color:#000;">Act<br><span style="font-size:9px;">motor command</span></div>
+                    <div class="vlm-arrow">&rarr;</div>
+                    <div class="vlm-stage" style="background:#1e1e2e;color:var(--cyber-cyan);border:1px solid var(--border-color);">Loop</div>
+                </div>
+                <div class="caption">Pac-Man and a warehouse robot use the same loop. Only the input resolution and action space change.</div>
+            </div>
+
+            <div class="sub-label">Visual Grounding</div>
+            <p><strong>Visual grounding</strong> &mdash; connecting what you see to actions &mdash; is the fundamental capability. In Pac-Man, "ghost approaching from the left" maps to "go right." In a warehouse, "obstacle on the left" maps to "steer right." The spatial reasoning is identical; only the vocabulary changes.</p>
+
+            <div class="sub-label">What Transfers</div>
+            <p><strong>Pac-Man maze</strong> &rarr; <strong>Robot navigation</strong>: walls become physical obstacles, corridors become hallways.</p>
+            <p><strong>Ghost threats</strong> &rarr; <strong>Dynamic obstacles</strong>: moving objects that require avoidance planning.</p>
+            <p><strong>Pellet collection</strong> &rarr; <strong>Task objectives</strong>: navigate to goal locations efficiently.</p>
+            <p><strong>Decision points (turns)</strong> &rarr; <strong>Intersection handling</strong>: where the model must choose between paths.</p>
+        </div>
+    </details>
+
+    <!-- GRADUATION -->
+    <div class="section-header">
+        <span>Graduation</span>
+        <span class="line"></span>
+    </div>
+
+    <!-- 10. COMPLETION CHECKLIST -->
+    <details open>
+        <summary>
+            <span class="exp-num baseline">10</span>
+            Completion Checklist
+        </summary>
+        <div class="content">
+            <p>You're ready to move on when you can explain each concept below. Check off each item honestly:</p>
+            <ul class="checklist">
+                <li><input type="checkbox" id="g1"><label for="g1">I understand how VLMs process images as tokens (vision encoder &rarr; projection &rarr; LLM)</label></li>
+                <li><input type="checkbox" id="g2"><label for="g2">I can explain why LoRA rank is higher for VLMs (r=32) than text SFT (r=16)</label></li>
+                <li><input type="checkbox" id="g3"><label for="g3">I know the Pac-Man action space (NONE, UP, DOWN, LEFT, RIGHT) and system prompt</label></li>
+                <li><input type="checkbox" id="g4"><label for="g4">I understand dataset balancing: max_noop_ratio=0.25, decision_point_oversample=3</label></li>
+                <li><input type="checkbox" id="g5"><label for="g5">I can run a game adapter training cycle and evaluate the results</label></li>
+            </ul>
+            <p style="margin-top:16px">All checked? <a href="/learn/defender-rl" style="color:var(--cyber-green)">Move to Phase 5: Defender RL &rarr;</a></p>
+        </div>
+    </details>
+
+</div>
+
+<script>
+// Copy button
+function copyCode(btn) {
+    const code = btn.parentElement.querySelector('code');
+    navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    }).catch(() => {
+        // Fallback for non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = code.textContent;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+}
+
+// Notes persistence
+document.querySelectorAll('.note-area').forEach(el => {
+    const key = 'game_vlm_note_' + el.dataset.experiment;
+    el.value = localStorage.getItem(key) || '';
+    el.addEventListener('input', () => localStorage.setItem(key, el.value));
+});
+
+// Checklist persistence
+document.querySelectorAll('.checklist input[type="checkbox"]').forEach(el => {
+    const key = 'game_vlm_check_' + el.id;
+    el.checked = localStorage.getItem(key) === 'true';
+    el.addEventListener('change', () => localStorage.setItem(key, el.checked));
+});
+</script>
+
+</body>
+</html>
