@@ -21,6 +21,7 @@ unsloth_compiled_cache/
 .cache/
 
 # Logs
+logs/
 *.log
 
 # IDE
